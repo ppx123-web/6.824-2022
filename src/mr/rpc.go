@@ -43,6 +43,7 @@ type MapArg struct {
 	Input  string
 	Output []string
 	Pid    int
+	Id     int
 }
 
 type ReduceArg struct {

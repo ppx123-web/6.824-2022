@@ -36,7 +36,8 @@ func Worker(mapf func(string, string) []KeyValue,
 	for {
 		call("Coordinator.AskForTask", &task, &reply)
 		if reply.Tp == Map {
-			// fmt.Printf("Get Map Task %v\n", os.Getpid())
+			reply.Id -= 10
+			// fmt.Printf("Worker:Get Map Task %v, %v\n", reply.Id, reply.File[0])
 			ret := MapWork(mapf, &reply)
 			ret.Pid = task.Pid
 			// fmt.Printf("Finish Map Task\n")
@@ -45,7 +46,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			}
 		} else if reply.Tp == Reduce {
 			reply.Id -= 10
-			// fmt.Printf("Get Reduce Task %v\n", os.Getpid())
+			// fmt.Printf("Worker:Get Reduce Task %v\n", reply.Id)
 			ret := ReduceWork(reducef, &reply)
 			ret.Pid = task.Pid
 			// fmt.Printf("Finish Reduce Task\n")
@@ -71,13 +72,18 @@ func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
 
 func MapWork(mapf func(string, string) []KeyValue, arg *TaskReply) MapArg {
+	// if arg.Id == 0 {
+	// 	os.Exit(1)
+	// }
 	var intermediate []KeyValue
 
 	filename := arg.File[0]
 	file, _ := os.Open(filename)
 	content, _ := ioutil.ReadAll(file)
 	file.Close()
+
 	kva := mapf(filename, string(content))
+
 	intermediate = append(intermediate, kva...)
 	sort.Sort(ByKey(intermediate))
 
@@ -98,7 +104,8 @@ func MapWork(mapf func(string, string) []KeyValue, arg *TaskReply) MapArg {
 		i = j
 	}
 	var reply TaskReply
-	call("Coordinator.MapWrite", &MapArg{Input: arg.File[0], Pid: os.Getpid()}, &reply)
+	call("Coordinator.MapWrite", &MapArg{Input: arg.File[0], Id: arg.Id, Pid: os.Getpid()}, &reply)
+	// fmt.Printf("Worker:MapWrite ret  %v %v %v\n", arg.File[0], arg.Id, reply.Tp)
 	if reply.Tp == WRITE {
 		for i, v := range values {
 			WriteJson(fmt.Sprintf("mr-%v-%v", arg.Id, i), v)
@@ -182,7 +189,10 @@ func ReadJson(filename string) map[string][]string {
 
 func WriteJson(filename string, values map[string][]string) {
 	output, _ := json.Marshal(values)
-	f, _ := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, os.ModePerm)
+	f, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.ModePerm)
+	if err != nil {
+		log.Fatal("Write Json Error %v\n", filename)
+	}
 	fmt.Fprintf(f, string(output))
 	f.Close()
 }
