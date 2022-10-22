@@ -93,31 +93,31 @@ func (c *Coordinator) CheckFail() {
 
 // Your code here -- RPC handlers for the worker to call.
 
-func (m *Coordinator) AskForTask(args *TaskArg, reply *TaskReply) error {
-	if len(m.Files) > 0 {
-		file := <-m.Files
-		id := <-m.MapCnt
+func (c *Coordinator) AskForTask(args *TaskArg, reply *TaskReply) error {
+	if len(c.Files) > 0 {
+		file := <-c.Files
+		id := <-c.MapCnt
 
 		reply.Tp = Map
 		reply.File = []string{file}
-		reply.NReduce = m.Nreduce
+		reply.NReduce = c.Nreduce
 		reply.Id = id
 
-		m.MapLock.lock()
-		m.MapFile[file] = UsingInfo{Time: int(time.Now().Unix()), Part: -1, Id: id, flag: true, Pid: args.Pid}
-		m.MapLock.unlock()
-	} else if len(m.ReduceCnt) > 0 && m.MapFinish == m.FileCnt {
-		id := <-m.ReduceCnt
+		c.MapLock.lock()
+		c.MapFile[file] = UsingInfo{Time: int(time.Now().Unix()), Part: -1, Id: id, flag: true, Pid: args.Pid}
+		c.MapLock.unlock()
+	} else if len(c.ReduceCnt) > 0 && c.MapFinish == c.FileCnt {
+		id := <-c.ReduceCnt
 
 		reply.Tp = Reduce
 		reply.Id = id + 10
-		reply.FileCnt = m.FileCnt
-		reply.NReduce = m.Nreduce
+		reply.FileCnt = c.FileCnt
+		reply.NReduce = c.Nreduce
 		reply.File = []string{fmt.Sprintf("intermediate-%v", id)}
-		m.MapLock.lock()
-		m.ReduceFile[id] = UsingInfo{Time: int(time.Now().Unix()), Part: id, Id: id, flag: true, Pid: args.Pid}
-		m.MapLock.unlock()
-	} else if m.MapFinish == m.FileCnt && m.ReduceFinish == m.Nreduce {
+		c.MapLock.lock()
+		c.ReduceFile[id] = UsingInfo{Time: int(time.Now().Unix()), Part: id, Id: id, flag: true, Pid: args.Pid}
+		c.MapLock.unlock()
+	} else if c.MapFinish == c.FileCnt && c.ReduceFinish == c.Nreduce {
 		reply.Tp = FINISH
 	} else {
 		reply.Tp = WAIT
@@ -125,13 +125,12 @@ func (m *Coordinator) AskForTask(args *TaskArg, reply *TaskReply) error {
 	return nil
 }
 
-func (m *Coordinator) MapWrite(args *MapArg, reply *TaskReply) error {
-	m.MapLock.lock()
-	defer m.MapLock.unlock()
-	if info, ok := m.MapFile[args.Input]; ok {
-		if m.MapFile[args.Input].flag && info.Pid == args.Pid {
+func (c *Coordinator) MapWrite(args *MapArg, reply *TaskReply) error {
+	c.MapLock.lock()
+	if info, ok := c.MapFile[args.Input]; ok {
+		if c.MapFile[args.Input].flag && info.Pid == args.Pid {
 			info.flag = false
-			m.MapFile[args.Input] = info
+			c.MapFile[args.Input] = info
 			reply.Tp = WRITE
 		} else {
 			reply.Tp = NOTWRITE
@@ -139,43 +138,45 @@ func (m *Coordinator) MapWrite(args *MapArg, reply *TaskReply) error {
 	} else {
 		reply.Tp = NOTWRITE
 	}
+	c.MapLock.unlock()
 	return nil
 }
 
-func (m *Coordinator) FinishMap(args *MapArg, reply *TaskReply) error {
-	m.MapLock.lock()
-	defer m.MapLock.unlock()
-	if m.MapFile[args.Input].Pid == args.Pid {
-		delete(m.MapFile, args.Input)
-		m.MapFinish++
+func (c *Coordinator) FinishMap(args *MapArg, reply *TaskReply) error {
+	c.MapLock.lock()
+	if c.MapFile[args.Input].Pid == args.Pid {
+		delete(c.MapFile, args.Input)
+		c.MapFinish++
 	}
+	c.MapLock.unlock()
 	return nil
 }
 
-func (m *Coordinator) ReduceWrite(args *ReduceArg, reply *TaskReply) error {
-	m.MapLock.lock()
-	defer m.MapLock.unlock()
-	if item, ok := m.ReduceFile[args.Id]; ok {
+func (c *Coordinator) ReduceWrite(args *ReduceArg, reply *TaskReply) error {
+	c.MapLock.lock()
+	if item, ok := c.ReduceFile[args.Id]; ok {
 		if item.flag {
 			reply.Tp = WRITE
 			item.flag = false
-			m.ReduceFile[args.Id] = item
+			c.ReduceFile[args.Id] = item
 		} else {
 			reply.Tp = NOTWRITE
 		}
 	} else {
 		reply.Tp = NOTWRITE
 	}
+	c.MapLock.unlock()
 	return nil
 }
 
-func (m *Coordinator) FinishReduce(args *ReduceArg, reply *TaskReply) error {
-	m.MapLock.lock()
-	defer m.MapLock.unlock()
-	if _, ok := m.ReduceFile[args.Id]; ok {
-		delete(m.ReduceFile, args.Id)
-		m.ReduceFinish++
+func (c *Coordinator) FinishReduce(args *ReduceArg, reply *TaskReply) error {
+	c.MapLock.lock()
+	defer c.MapLock.unlock()
+	if _, ok := c.ReduceFile[args.Id]; ok {
+		delete(c.ReduceFile, args.Id)
+		c.ReduceFinish++
 	}
+	c.MapLock.unlock()
 	return nil
 }
 

@@ -34,14 +34,14 @@ func Worker(mapf func(string, string) []KeyValue,
 	var task TaskArg
 	task.Pid = os.Getpid()
 	for {
-		call("Master.AskForTask", &task, &reply)
+		call("Coordinator.AskForTask", &task, &reply)
 		if reply.Tp == Map {
 			// fmt.Printf("Get Map Task %v\n", os.Getpid())
 			ret := MapWork(mapf, &reply)
 			ret.Pid = task.Pid
 			// fmt.Printf("Finish Map Task\n")
 			if len(ret.Input) > 0 {
-				call("Master.FinishMap", &ret, &reply)
+				call("Coordinator.FinishMap", &ret, &reply)
 			}
 		} else if reply.Tp == Reduce {
 			reply.Id -= 10
@@ -50,7 +50,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			ret.Pid = task.Pid
 			// fmt.Printf("Finish Reduce Task\n")
 			if ret.Id != -1 {
-				call("Master.FinishReduce", &ret, &reply)
+				call("Coordinator.FinishReduce", &ret, &reply)
 			}
 		} else if reply.Tp == WAIT {
 			time.Sleep(time.Second * 1)
@@ -98,7 +98,7 @@ func MapWork(mapf func(string, string) []KeyValue, arg *TaskReply) MapArg {
 		i = j
 	}
 	var reply TaskReply
-	call("Master.MapWrite", &MapArg{Input: arg.File[0], Pid: os.Getpid()}, &reply)
+	call("Coordinator.MapWrite", &MapArg{Input: arg.File[0], Pid: os.Getpid()}, &reply)
 	if reply.Tp == WRITE {
 		for i, v := range values {
 			WriteJson(fmt.Sprintf("mr-%v-%v", arg.Id, i), v)
@@ -126,7 +126,7 @@ func ReduceWork(reducef func(string, []string) string, arg *TaskReply) ReduceArg
 		res[k] += reducef(k, v)
 	}
 	var reply TaskReply
-	call("Master.ReduceWrite", &ReduceArg{Id: arg.Id, Pid: os.Getpid()}, &reply)
+	call("Coordinator.ReduceWrite", &ReduceArg{Id: arg.Id, Pid: os.Getpid()}, &reply)
 	if reply.Tp == WRITE {
 		str := fmt.Sprintf("mr-out-%v", arg.Id)
 		outputfile, _ := os.OpenFile(str, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.ModePerm)
@@ -141,7 +141,7 @@ func ReduceWork(reducef func(string, []string) string, arg *TaskReply) ReduceArg
 
 }
 
-// send an RPC request to the master, wait for the response.
+// send an RPC request to the Coordinator, wait for the response.
 // usually returns true.
 // returns false if something goes wrong.
 func call(rpcname string, args interface{}, reply interface{}) bool {
