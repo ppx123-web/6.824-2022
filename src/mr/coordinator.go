@@ -71,17 +71,18 @@ func (c *Coordinator) CheckFail() {
 				reducelist = append(reducelist, k)
 			}
 		}
-		c.MapLock.unlock()
 
 		for i, f := range mapfile {
 			c.Files <- f
 			c.MapCnt <- mapid[i]
+			delete(c.MapFile, f)
 		}
 
 		for _, id := range reducelist {
 			c.ReduceCnt <- id
+			delete(c.ReduceFile, id)
 		}
-
+		c.MapLock.unlock()
 		if c.MapFinish == c.FileCnt && c.ReduceFinish == c.Nreduce {
 			break
 		} else {

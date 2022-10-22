@@ -116,7 +116,6 @@ func ReduceWork(reducef func(string, []string) string, arg *TaskReply) ReduceArg
 	for i := 0; i < arg.FileCnt; i++ {
 		filename := fmt.Sprintf("mr-%v-%v", i, arg.Id)
 		values := ReadJson(filename)
-		os.Remove(filename)
 		for k, v := range values {
 			all[k] = append(all[k], v...)
 		}
@@ -128,6 +127,10 @@ func ReduceWork(reducef func(string, []string) string, arg *TaskReply) ReduceArg
 	var reply TaskReply
 	call("Coordinator.ReduceWrite", &ReduceArg{Id: arg.Id, Pid: os.Getpid()}, &reply)
 	if reply.Tp == WRITE {
+		for i := 0; i < arg.FileCnt; i++ {
+			filename := fmt.Sprintf("mr-%v-%v", i, arg.Id)
+			os.Remove(filename)
+		}
 		str := fmt.Sprintf("mr-out-%v", arg.Id)
 		outputfile, _ := os.OpenFile(str, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.ModePerm)
 		for k, v := range res {
