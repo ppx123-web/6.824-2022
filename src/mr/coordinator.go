@@ -171,7 +171,6 @@ func (c *Coordinator) ReduceWrite(args *ReduceArg, reply *TaskReply) error {
 
 func (c *Coordinator) FinishReduce(args *ReduceArg, reply *TaskReply) error {
 	c.MapLock.lock()
-	defer c.MapLock.unlock()
 	if _, ok := c.ReduceFile[args.Id]; ok {
 		delete(c.ReduceFile, args.Id)
 		c.ReduceFinish++
