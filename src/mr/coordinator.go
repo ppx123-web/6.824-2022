@@ -101,10 +101,11 @@ func (c *Coordinator) CheckFail() {
 		for _, id := range reducelist {
 			c.ReduceCnt <- id
 		}
-		c.MapLock.unlock()
 		if c.MapFinish == c.FileCnt && c.ReduceFinish == c.Nreduce {
+			c.MapLock.unlock()
 			break
 		} else {
+			c.MapLock.unlock()
 			time.Sleep(time.Second)
 		}
 	}
@@ -230,10 +231,13 @@ func (c *Coordinator) server() {
 func (c *Coordinator) Done() bool {
 	for {
 		time.Sleep(time.Second)
+		c.MapLock.lock()
 		if c.ReduceFinish == c.Nreduce {
+			c.MapLock.unlock()
 			time.Sleep(time.Second)
 			return true
 		}
+		c.MapLock.unlock()
 	}
 }
 
