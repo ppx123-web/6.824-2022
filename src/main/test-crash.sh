@@ -69,4 +69,5 @@ else
   echo '---' crash output is not the same as mr-correct-crash.txt
   echo '---' crash test: FAIL
   failed_any=1
+  exit 1
 fi
