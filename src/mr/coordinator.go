@@ -76,6 +76,8 @@ const CrashTime = 10
 
 // a loop to check whether there are some workers timeout or crash per second
 func (c *Coordinator) CheckFail() {
+	//当一个work已经进行MapWrite后，checkfail进行，将其标记加入队列，但是最终仍然可以进行FinishMap操作，而同一个任务进行了两次
+	//Write同理
 	for {
 		t := int(time.Now().Unix())
 		c.MapLock.lock()
