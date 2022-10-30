@@ -78,28 +78,18 @@ const CrashTime = 10
 func (c *Coordinator) CheckFail() {
 	for {
 		t := int(time.Now().Unix())
-		mapid := []int{}
-		reducelist := []int{}
 		c.MapLock.lock()
 		for _, v := range c.MapFile {
 			if t-v.Time >= CrashTime {
-				mapid = append(mapid, v.Id)
+				c.MapCnt <- v.Id
 				v.flag = false
 			}
 		}
 		for k, v := range c.ReduceFile {
-			if t-v.Time > CrashTime {
-				reducelist = append(reducelist, k)
+			if t-v.Time >= CrashTime {
+				c.ReduceCnt <- k
 				v.flag = false
 			}
-		}
-
-		for _, id := range mapid {
-			c.MapCnt <- id
-		}
-
-		for _, id := range reducelist {
-			c.ReduceCnt <- id
 		}
 		if c.MapFinish == c.FileCnt && c.ReduceFinish == c.Nreduce {
 			c.MapLock.unlock()
@@ -133,7 +123,7 @@ func (c *Coordinator) AskForTask(args *TaskArg, reply *TaskReply) error {
 		reply.Id = id + 10
 		reply.FileCnt = c.FileCnt
 		reply.NReduce = c.Nreduce
-		reply.File = []string{fmt.Sprintf("intermediate-%v", id)}
+		reply.File = []string{fmt.Sprintf("mr-%v", id)}
 
 		c.ReduceFile[id] = UsingInfo{Time: int(time.Now().Unix()), Part: id, Id: id, flag: true, Pid: args.Pid}
 	} else if c.MapFinish == c.FileCnt && c.ReduceFinish == c.Nreduce {
@@ -150,12 +140,12 @@ func (c *Coordinator) MapWrite(args *MapArg, reply *TaskReply) error {
 	c.MapLock.lock()
 	// reply.Tp = NOTWRITE
 	if info, ok := c.MapFile[args.Input]; ok {
-		if info.flag && info.Pid == args.Pid {
+		if info.flag && info.Pid == args.Pid && info.Id == args.Id {
 			info.flag = false
 			c.MapFile[args.Input] = info
 			reply.Tp = WRITE
 			//cannot assign to struct field c.MapFile[args.Input].flag in map
-			// fmt.Printf("Coordinator:Map Finish %v\n", args.Input)
+			// fmt.Printf("Coordinator:Map Ask For Write %v\n", args.Input)
 		} else {
 			// fmt.Printf("Coordinator:Map Wrong Pid or flag abort %v\n", args.Input)
 			reply.Tp = NOTWRITE
@@ -171,13 +161,17 @@ func (c *Coordinator) MapWrite(args *MapArg, reply *TaskReply) error {
 // A worker finishes Map
 func (c *Coordinator) FinishMap(args *MapArg, reply *TaskReply) error {
 	c.MapLock.lock()
-	if c.MapFile[args.Input].Pid == args.Pid {
-		delete(c.MapFile, args.Input)
-		c.MapFinish++
-		// if c.MapFinish == c.FileCnt {
-		// 	fmt.Printf("Map All Finish\n")
-		// }
+	if info, ok := c.MapFile[args.Input]; ok {
+		if !info.flag && info.Pid == args.Pid && info.Id == args.Id {
+			delete(c.MapFile, args.Input)
+			c.MapFinish++
+			// fmt.Printf("Coordinator:Map Finish %v, left %v\n", args.Input, c.FileCnt-c.MapFinish)
+			// if c.MapFinish == c.FileCnt {
+			// 	fmt.Printf("Map All Finish\n")
+			// }
+		}
 	}
+
 	c.MapLock.unlock()
 	return nil
 }

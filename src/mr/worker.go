@@ -40,8 +40,8 @@ func Worker(mapf func(string, string) []KeyValue,
 			// fmt.Printf("Worker:Get Map Task %v, %v\n", reply.Id, reply.File[0])
 			ret := MapWork(mapf, &reply)
 			ret.Pid = task.Pid
-			// fmt.Printf("Finish Map Task\n")
 			if len(ret.Input) > 0 {
+				// fmt.Printf("Worker:Finish Map Task\n")
 				call("Coordinator.FinishMap", &ret, &reply)
 			}
 		} else if reply.Tp == Reduce {
@@ -52,9 +52,11 @@ func Worker(mapf func(string, string) []KeyValue,
 			// fmt.Printf("Finish Reduce Task\n")
 			if ret.Id != -1 {
 				call("Coordinator.FinishReduce", &ret, &reply)
+			} else {
+				break
 			}
 		} else if reply.Tp == WAIT {
-			time.Sleep(time.Second * 1)
+			time.Sleep(time.Microsecond * 300)
 		} else if reply.Tp == FINISH {
 			break
 			// quit when finish
@@ -72,14 +74,14 @@ func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
 
 func MapWork(mapf func(string, string) []KeyValue, arg *TaskReply) MapArg {
-	// if arg.Id == 0 {
-	// 	os.Exit(1)
-	// }
 	var intermediate []KeyValue
 
 	filename := arg.File[0]
 	file, _ := os.Open(filename)
-	content, _ := ioutil.ReadAll(file)
+	content, err := ioutil.ReadAll(file)
+	if err != nil {
+		log.Fatal("Map Read %v", err)
+	}
 	file.Close()
 
 	kva := mapf(filename, string(content))
@@ -110,7 +112,7 @@ func MapWork(mapf func(string, string) []KeyValue, arg *TaskReply) MapArg {
 		for i, v := range values {
 			WriteJson(fmt.Sprintf("mr-%v-%v", arg.Id, i), v)
 		}
-		return MapArg{Input: arg.File[0]}
+		return MapArg{Input: arg.File[0], Id: arg.Id}
 	} else {
 		return MapArg{Input: ""}
 	}
@@ -158,9 +160,7 @@ func call(rpcname string, args interface{}, reply interface{}) bool {
 	//c, err := rpc.DialHTTP("tcp", "127.0.0.1"+":1234")
 	sockname := coordinatorSock()
 	c, err := rpc.DialHTTP("unix", sockname)
-	if err != nil {
-		log.Fatal("dialing:", err)
-	}
+	CheckErrorAndExit(err)
 	defer c.Close()
 
 	err = c.Call(rpcname, args, reply)
@@ -175,15 +175,12 @@ func call(rpcname string, args interface{}, reply interface{}) bool {
 func ReadJson(filename string) map[string][]string {
 	values := make(map[string][]string)
 	file, err := os.Open(filename)
-	if err != nil {
-		log.Fatal("Error Open " + filename + "\n")
-	}
+	CheckErrorAndExit(err)
 	content, err := ioutil.ReadAll(file)
-	if err != nil {
-		log.Fatal("Error Read " + filename + "\n")
-	}
+	CheckErrorAndExit(err)
 	file.Close()
-	json.Unmarshal(content, &values)
+	err = json.Unmarshal(content, &values)
+	CheckErrorAndExit(err)
 	return values
 }
 
@@ -191,8 +188,18 @@ func WriteJson(filename string, values map[string][]string) {
 	output, _ := json.Marshal(values)
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.ModePerm)
 	if err != nil {
-		log.Fatal("Write Json Error %v\n", filename)
+		log.Fatal(err)
 	}
-	fmt.Fprintf(f, string(output))
+	_, err = fmt.Fprintf(f, string(output))
+	if err != nil {
+		log.Fatal(err)
+	}
 	f.Close()
+}
+
+func CheckErrorAndExit(err error) {
+	if err != nil {
+		fmt.Printf("%v\n", err)
+		os.Exit(1)
+	}
 }
