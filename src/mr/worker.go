@@ -80,7 +80,7 @@ func MapWork(mapf func(string, string) []KeyValue, arg *TaskReply) MapArg {
 	file, _ := os.Open(filename)
 	content, err := ioutil.ReadAll(file)
 	if err != nil {
-		log.Fatal("Map Read %v", err)
+		log.Fatal("Map Read ", err)
 	}
 	file.Close()
 
@@ -107,7 +107,7 @@ func MapWork(mapf func(string, string) []KeyValue, arg *TaskReply) MapArg {
 	}
 	var reply TaskReply
 	call("Coordinator.MapWrite", &MapArg{Input: arg.File[0], Id: arg.Id, Pid: os.Getpid()}, &reply)
-	// fmt.Printf("Worker:MapWrite ret  %v %v %v\n", arg.File[0], arg.Id, reply.Tp)
+	// fmt.Printf("Worker:	MapWrite ret  %v %v %v\n", arg.File[0], arg.Id, reply.Tp)
 	if reply.Tp == WRITE {
 		for i, v := range values {
 			WriteJson(fmt.Sprintf("mr-%v-%v", arg.Id, i), v)
@@ -187,13 +187,9 @@ func ReadJson(filename string) map[string][]string {
 func WriteJson(filename string, values map[string][]string) {
 	output, _ := json.Marshal(values)
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.ModePerm)
-	if err != nil {
-		log.Fatal(err)
-	}
-	_, err = fmt.Fprintf(f, string(output))
-	if err != nil {
-		log.Fatal(err)
-	}
+	CheckErrorAndExit(err)
+	_, err = fmt.Fprint(f, string(output))
+	CheckErrorAndExit(err)
 	f.Close()
 }
 

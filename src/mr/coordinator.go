@@ -31,20 +31,21 @@ To protect from data racing, use lock (chan int) to protect map
 
 */
 
-type FileState int
+type TaskState int
 
 const (
-	NEW FileState = iota + 1
-	OLD
-	USING
+	Running TaskState = iota + 1
+	GetWritePerm
+	FinishWrite
+	Dead
 )
 
 type UsingInfo struct {
-	Time int
-	Id   int
-	Part int
-	flag bool
-	Pid  int
+	State TaskState
+	Time  int
+	Id    int
+	Part  int
+	Pid   int
 }
 
 type Lock chan int
@@ -55,8 +56,8 @@ type Coordinator struct {
 	ReduceCnt, MapCnt       chan int
 	FileCnt                 int
 	Files                   []string
-	MapFile                 map[string]UsingInfo
-	ReduceFile              map[int]UsingInfo
+	MapFile                 map[string]*UsingInfo
+	ReduceFile              map[int]*UsingInfo
 	Reduces                 []string
 	MapLock                 Lock
 }
@@ -82,15 +83,17 @@ func (c *Coordinator) CheckFail() {
 		t := int(time.Now().Unix())
 		c.MapLock.lock()
 		for _, v := range c.MapFile {
-			if t-v.Time >= CrashTime {
+			if t-v.Time >= CrashTime && v.State == Running {
 				c.MapCnt <- v.Id
-				v.flag = false
+				v.State = Dead
+				fmt.Printf("Coordinator: map %v %v fail\n", v.Id, c.Files[v.Id])
 			}
 		}
 		for k, v := range c.ReduceFile {
-			if t-v.Time >= CrashTime {
+			if t-v.Time >= CrashTime && v.State == Running {
 				c.ReduceCnt <- k
-				v.flag = false
+				v.State = Dead
+				fmt.Printf("Coordinator: reduce %v fail\n", v.Id)
 			}
 		}
 		if c.MapFinish == c.FileCnt && c.ReduceFinish == c.Nreduce {
@@ -117,8 +120,12 @@ func (c *Coordinator) AskForTask(args *TaskArg, reply *TaskReply) error {
 		reply.File = []string{file}
 		reply.NReduce = c.Nreduce
 		reply.Id = id + 10
-		// fmt.Printf("Coordinator:Assign Map %v %v\n", id, file)
-		c.MapFile[file] = UsingInfo{Time: int(time.Now().Unix()), Part: -1, Id: id, flag: true, Pid: args.Pid}
+		fmt.Printf("Coordinator: Assign Map %v %v\n", id, file)
+		if item, ok := c.MapFile[file]; ok && item.State != Dead {
+			fmt.Printf("Coordinator: Assign Wrong Map Task, %v % v %v\n", id, file, item.State)
+			os.Exit(1)
+		}
+		c.MapFile[file] = &UsingInfo{Time: int(time.Now().Unix()), Part: -1, Id: id, State: Running, Pid: args.Pid}
 	} else if len(c.ReduceCnt) > 0 && c.MapFinish == c.FileCnt {
 		id := <-c.ReduceCnt
 		reply.Tp = Reduce
@@ -126,8 +133,12 @@ func (c *Coordinator) AskForTask(args *TaskArg, reply *TaskReply) error {
 		reply.FileCnt = c.FileCnt
 		reply.NReduce = c.Nreduce
 		reply.File = []string{fmt.Sprintf("mr-%v", id)}
-
-		c.ReduceFile[id] = UsingInfo{Time: int(time.Now().Unix()), Part: id, Id: id, flag: true, Pid: args.Pid}
+		fmt.Printf("Coordinator: Assign reduce %v\n", id)
+		if item, ok := c.ReduceFile[id]; ok && item.State != Dead {
+			fmt.Printf("Coordinator: Assign Wrong Reduce Task, %v %v\n", id, item.State)
+			os.Exit(1)
+		}
+		c.ReduceFile[id] = &UsingInfo{Time: int(time.Now().Unix()), Part: id, Id: id, State: Running, Pid: args.Pid}
 	} else if c.MapFinish == c.FileCnt && c.ReduceFinish == c.Nreduce {
 		reply.Tp = FINISH
 	} else {
@@ -142,19 +153,19 @@ func (c *Coordinator) MapWrite(args *MapArg, reply *TaskReply) error {
 	c.MapLock.lock()
 	// reply.Tp = NOTWRITE
 	if info, ok := c.MapFile[args.Input]; ok {
-		if info.flag && info.Pid == args.Pid && info.Id == args.Id {
-			info.flag = false
-			c.MapFile[args.Input] = info
+		if info.State == Running && info.Pid == args.Pid && info.Id == args.Id {
+			info.State = GetWritePerm
 			reply.Tp = WRITE
-			//cannot assign to struct field c.MapFile[args.Input].flag in map
-			// fmt.Printf("Coordinator:Map Ask For Write %v\n", args.Input)
+			fmt.Printf("Coordinator: Map Ask For Write %v\n", args.Input)
 		} else {
-			// fmt.Printf("Coordinator:Map Wrong Pid or flag abort %v\n", args.Input)
+			fmt.Printf("Coordinator: Refule Map Write %v, state=%v\n", args.Input, info.State)
+			info.State = Dead
 			reply.Tp = NOTWRITE
 		}
 	} else {
-		// fmt.Printf("Coordinator:Map No MapFile abort %v\n", args.Input)
+		info.State = Dead
 		reply.Tp = NOTWRITE
+		fmt.Printf("Coordinator: Refuse Map Write %v, task doesn't exist\n", args.Input)
 	}
 	c.MapLock.unlock()
 	return nil
@@ -164,14 +175,20 @@ func (c *Coordinator) MapWrite(args *MapArg, reply *TaskReply) error {
 func (c *Coordinator) FinishMap(args *MapArg, reply *TaskReply) error {
 	c.MapLock.lock()
 	if info, ok := c.MapFile[args.Input]; ok {
-		if !info.flag && info.Pid == args.Pid && info.Id == args.Id {
-			delete(c.MapFile, args.Input)
+		if info.State == GetWritePerm && info.Pid == args.Pid && info.Id == args.Id {
+			info.State = FinishWrite
 			c.MapFinish++
-			// fmt.Printf("Coordinator:Map Finish %v, left %v\n", args.Input, c.FileCnt-c.MapFinish)
-			// if c.MapFinish == c.FileCnt {
-			// 	fmt.Printf("Map All Finish\n")
-			// }
+			fmt.Printf("Coordinator: Map Finish %v, left %v\n", args.Input, c.FileCnt-c.MapFinish)
+			if c.MapFinish == c.FileCnt {
+				fmt.Printf("Coordinator: Map All Finish\n")
+			}
+		} else {
+			fmt.Printf("Coordinator: Refuse Map Finish, %v, state=%v\n", args.Id, info.State)
+			info.State = Dead
 		}
+	} else {
+		fmt.Printf("Coordinator: Refuse Map Finish %v, task doesn't exist\n", args.Id)
+		info.State = Dead
 	}
 
 	c.MapLock.unlock()
@@ -182,16 +199,19 @@ func (c *Coordinator) FinishMap(args *MapArg, reply *TaskReply) error {
 func (c *Coordinator) ReduceWrite(args *ReduceArg, reply *TaskReply) error {
 	c.MapLock.lock()
 	if item, ok := c.ReduceFile[args.Id]; ok {
-		if item.flag && item.Pid == args.Pid {
+		if item.State == Running && item.Pid == args.Pid && args.Id == item.Id {
 			reply.Tp = WRITE
-			item.flag = false
-			c.ReduceFile[args.Id] = item
-			//cannot assign to struct field c.ReduceFile[args.Id].flag in map
+			item.State = GetWritePerm
+			fmt.Printf("Coordinator: Reduce Ask For Write %v\n", args.Id)
 		} else {
 			reply.Tp = NOTWRITE
+			item.State = Dead
+			fmt.Printf("Coordinator: Refuse reduce Write %v, state=%v\n", args.Id, item.State)
 		}
 	} else {
 		reply.Tp = NOTWRITE
+		item.State = Dead
+		fmt.Printf("Coordinator: Refuse reduce Write %v, task doesn't exist\n", args.Id)
 	}
 	c.MapLock.unlock()
 	return nil
@@ -200,9 +220,13 @@ func (c *Coordinator) ReduceWrite(args *ReduceArg, reply *TaskReply) error {
 // A worker finishes Reduce
 func (c *Coordinator) FinishReduce(args *ReduceArg, reply *TaskReply) error {
 	c.MapLock.lock()
-	if _, ok := c.ReduceFile[args.Id]; ok && args.Pid == c.ReduceFile[args.Id].Pid {
-		delete(c.ReduceFile, args.Id)
+	if item, ok := c.ReduceFile[args.Id]; ok && item.State == GetWritePerm && args.Pid == item.Pid && item.Id == args.Id {
+		item.State = FinishWrite
 		c.ReduceFinish++
+		fmt.Printf("Coordinator: Reduce Finish %v, left %v\n", args.Id, c.Nreduce-c.ReduceFinish)
+	} else {
+		item.State = Dead
+		fmt.Printf("Coordinator: Refuse Reduce Finish %v, task doesn't exist or Wrong info %v\n", args.Id, item.State)
 	}
 	c.MapLock.unlock()
 	return nil
@@ -246,8 +270,8 @@ func MakeCoordinator(files []string, nReduce int) *Coordinator {
 		ReduceCnt:    make(chan int, nReduce),
 		MapCnt:       make(chan int, nReduce),
 		FileCnt:      len(files),
-		MapFile:      make(map[string]UsingInfo),
-		ReduceFile:   make(map[int]UsingInfo),
+		MapFile:      make(map[string]*UsingInfo),
+		ReduceFile:   make(map[int]*UsingInfo),
 		Files:        files[:],
 		Reduces:      []string{},
 		MapFinish:    0,
