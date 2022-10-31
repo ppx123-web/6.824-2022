@@ -38,6 +38,7 @@ const (
 	GetWritePerm
 	FinishWrite
 	Dead
+	WaitForAlloc
 )
 
 type UsingInfo struct {
@@ -83,16 +84,16 @@ func (c *Coordinator) CheckFail() {
 		t := int(time.Now().Unix())
 		c.MapLock.lock()
 		for _, v := range c.MapFile {
-			if t-v.Time >= CrashTime && v.State == Running {
+			if v.State == Dead || (t-v.Time >= CrashTime && v.State == Running) {
 				c.MapCnt <- v.Id
-				v.State = Dead
+				v.State = WaitForAlloc
 				fmt.Printf("Coordinator: map %v %v fail\n", v.Id, c.Files[v.Id])
 			}
 		}
 		for k, v := range c.ReduceFile {
-			if t-v.Time >= CrashTime && v.State == Running {
+			if v.State == Dead || (t-v.Time >= CrashTime && v.State == Running) {
 				c.ReduceCnt <- k
-				v.State = Dead
+				v.State = WaitForAlloc
 				fmt.Printf("Coordinator: reduce %v fail\n", v.Id)
 			}
 		}
@@ -121,7 +122,7 @@ func (c *Coordinator) AskForTask(args *TaskArg, reply *TaskReply) error {
 		reply.NReduce = c.Nreduce
 		reply.Id = id + 10
 		fmt.Printf("Coordinator: Assign Map %v %v\n", id, file)
-		if item, ok := c.MapFile[file]; ok && item.State != Dead {
+		if item, ok := c.MapFile[file]; ok && item.State != WaitForAlloc {
 			fmt.Printf("Coordinator: Assign Wrong Map Task, %v % v %v\n", id, file, item.State)
 			os.Exit(1)
 		}
@@ -134,7 +135,7 @@ func (c *Coordinator) AskForTask(args *TaskArg, reply *TaskReply) error {
 		reply.NReduce = c.Nreduce
 		reply.File = []string{fmt.Sprintf("mr-%v", id)}
 		fmt.Printf("Coordinator: Assign reduce %v\n", id)
-		if item, ok := c.ReduceFile[id]; ok && item.State != Dead {
+		if item, ok := c.ReduceFile[id]; ok && item.State != WaitForAlloc {
 			fmt.Printf("Coordinator: Assign Wrong Reduce Task, %v %v\n", id, item.State)
 			os.Exit(1)
 		}
@@ -152,13 +153,14 @@ func (c *Coordinator) AskForTask(args *TaskArg, reply *TaskReply) error {
 func (c *Coordinator) MapWrite(args *MapArg, reply *TaskReply) error {
 	c.MapLock.lock()
 	// reply.Tp = NOTWRITE
+	fmt.Printf("Coordinator: Get Map Write Request %v %v\n", args.Input, args.Id)
 	if info, ok := c.MapFile[args.Input]; ok {
 		if info.State == Running && info.Pid == args.Pid && info.Id == args.Id {
 			info.State = GetWritePerm
 			reply.Tp = WRITE
 			fmt.Printf("Coordinator: Map Ask For Write %v\n", args.Input)
 		} else {
-			fmt.Printf("Coordinator: Refule Map Write %v, state=%v\n", args.Input, info.State)
+			fmt.Printf("Coordinator: Refuse Map Write %v, state=%v\n", args.Input, info.State)
 			info.State = Dead
 			reply.Tp = NOTWRITE
 		}
@@ -174,6 +176,7 @@ func (c *Coordinator) MapWrite(args *MapArg, reply *TaskReply) error {
 // A worker finishes Map
 func (c *Coordinator) FinishMap(args *MapArg, reply *TaskReply) error {
 	c.MapLock.lock()
+	fmt.Printf("Coordinator: Get Map Finish Request %v %v\n", args.Input, args.Id)
 	if info, ok := c.MapFile[args.Input]; ok {
 		if info.State == GetWritePerm && info.Pid == args.Pid && info.Id == args.Id {
 			info.State = FinishWrite

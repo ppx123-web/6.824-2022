@@ -114,7 +114,7 @@ func MapWork(mapf func(string, string) []KeyValue, arg *TaskReply) MapArg {
 		}
 		return MapArg{Input: arg.File[0], Id: arg.Id}
 	} else {
-		return MapArg{Input: ""}
+		return MapArg{Input: "", Id: -1}
 	}
 
 }
