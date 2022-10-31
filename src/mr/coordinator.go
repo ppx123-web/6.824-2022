@@ -41,6 +41,12 @@ const (
 	WaitForAlloc
 )
 
+func TransitionToDead(item *UsingInfo) {
+	if item.State != WaitForAlloc {
+		item.State = Dead
+	}
+}
+
 type UsingInfo struct {
 	State TaskState
 	Time  int
@@ -154,18 +160,18 @@ func (c *Coordinator) MapWrite(args *MapArg, reply *TaskReply) error {
 	c.MapLock.lock()
 	// reply.Tp = NOTWRITE
 	fmt.Printf("Coordinator: Get Map Write Request %v %v\n", args.Input, args.Id)
-	if info, ok := c.MapFile[args.Input]; ok {
-		if info.State == Running && info.Pid == args.Pid && info.Id == args.Id {
-			info.State = GetWritePerm
+	if item, ok := c.MapFile[args.Input]; ok {
+		if item.State == Running && item.Pid == args.Pid && item.Id == args.Id {
+			item.State = GetWritePerm
 			reply.Tp = WRITE
 			fmt.Printf("Coordinator: Map Ask For Write %v\n", args.Input)
 		} else {
-			fmt.Printf("Coordinator: Refuse Map Write %v, state=%v\n", args.Input, info.State)
-			info.State = Dead
+			fmt.Printf("Coordinator: Refuse Map Write %v, state=%v\n", args.Input, item.State)
+			TransitionToDead(item)
 			reply.Tp = NOTWRITE
 		}
 	} else {
-		info.State = Dead
+		TransitionToDead(item)
 		reply.Tp = NOTWRITE
 		fmt.Printf("Coordinator: Refuse Map Write %v, task doesn't exist\n", args.Input)
 	}
@@ -177,21 +183,21 @@ func (c *Coordinator) MapWrite(args *MapArg, reply *TaskReply) error {
 func (c *Coordinator) FinishMap(args *MapArg, reply *TaskReply) error {
 	c.MapLock.lock()
 	fmt.Printf("Coordinator: Get Map Finish Request %v %v\n", args.Input, args.Id)
-	if info, ok := c.MapFile[args.Input]; ok {
-		if info.State == GetWritePerm && info.Pid == args.Pid && info.Id == args.Id {
-			info.State = FinishWrite
+	if item, ok := c.MapFile[args.Input]; ok {
+		if item.State == GetWritePerm && item.Pid == args.Pid && item.Id == args.Id {
+			item.State = FinishWrite
 			c.MapFinish++
 			fmt.Printf("Coordinator: Map Finish %v, left %v\n", args.Input, c.FileCnt-c.MapFinish)
 			if c.MapFinish == c.FileCnt {
 				fmt.Printf("Coordinator: Map All Finish\n")
 			}
 		} else {
-			fmt.Printf("Coordinator: Refuse Map Finish, %v, state=%v\n", args.Id, info.State)
-			info.State = Dead
+			fmt.Printf("Coordinator: Refuse Map Finish, %v, state=%v\n", args.Id, item.State)
+			TransitionToDead(item)
 		}
 	} else {
 		fmt.Printf("Coordinator: Refuse Map Finish %v, task doesn't exist\n", args.Id)
-		info.State = Dead
+		TransitionToDead(item)
 	}
 
 	c.MapLock.unlock()
@@ -208,12 +214,12 @@ func (c *Coordinator) ReduceWrite(args *ReduceArg, reply *TaskReply) error {
 			fmt.Printf("Coordinator: Reduce Ask For Write %v\n", args.Id)
 		} else {
 			reply.Tp = NOTWRITE
-			item.State = Dead
+			TransitionToDead(item)
 			fmt.Printf("Coordinator: Refuse reduce Write %v, state=%v\n", args.Id, item.State)
 		}
 	} else {
 		reply.Tp = NOTWRITE
-		item.State = Dead
+		TransitionToDead(item)
 		fmt.Printf("Coordinator: Refuse reduce Write %v, task doesn't exist\n", args.Id)
 	}
 	c.MapLock.unlock()
@@ -228,7 +234,7 @@ func (c *Coordinator) FinishReduce(args *ReduceArg, reply *TaskReply) error {
 		c.ReduceFinish++
 		fmt.Printf("Coordinator: Reduce Finish %v, left %v\n", args.Id, c.Nreduce-c.ReduceFinish)
 	} else {
-		item.State = Dead
+		TransitionToDead(item)
 		fmt.Printf("Coordinator: Refuse Reduce Finish %v, task doesn't exist or Wrong info %v\n", args.Id, item.State)
 	}
 	c.MapLock.unlock()
