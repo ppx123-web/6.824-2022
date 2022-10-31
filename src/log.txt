@@ -1,0 +1,85 @@
+*** Starting crash test.
+Coordinator: Assign Map 0 ../pg-being_ernest.txt
+Coordinator: Assign Map 1 ../pg-dorian_gray.txt
+Coordinator: Assign Map 2 ../pg-frankenstein.txt
+Coordinator: Assign Map 3 ../pg-grimm.txt
+Coordinator: Get Map Write Request ../pg-being_ernest.txt 0
+Coordinator: Map Ask For Write ../pg-being_ernest.txt
+Coordinator: Get Map Write Request ../pg-frankenstein.txt 2
+Coordinator: Map Ask For Write ../pg-frankenstein.txt
+Coordinator: Get Map Finish Request ../pg-being_ernest.txt 0
+Coordinator: Map Finish ../pg-being_ernest.txt, left 7
+Coordinator: Assign Map 4 ../pg-huckleberry_finn.txt
+Coordinator: Get Map Finish Request ../pg-frankenstein.txt 2
+Coordinator: Map Finish ../pg-frankenstein.txt, left 6
+Coordinator: Assign Map 5 ../pg-metamorphosis.txt
+Coordinator: Get Map Write Request ../pg-huckleberry_finn.txt 4
+Coordinator: Map Ask For Write ../pg-huckleberry_finn.txt
+Coordinator: Get Map Finish Request ../pg-huckleberry_finn.txt 4
+Coordinator: Map Finish ../pg-huckleberry_finn.txt, left 5
+Coordinator: Assign Map 6 ../pg-sherlock_holmes.txt
+Coordinator: Assign Map 7 ../pg-tom_sawyer.txt
+Coordinator: Get Map Write Request ../pg-tom_sawyer.txt 7
+Coordinator: Map Ask For Write ../pg-tom_sawyer.txt
+Coordinator: Get Map Finish Request ../pg-tom_sawyer.txt 7
+Coordinator: Map Finish ../pg-tom_sawyer.txt, left 4
+Coordinator: Get Map Write Request ../pg-metamorphosis.txt 5
+Coordinator: Map Ask For Write ../pg-metamorphosis.txt
+Coordinator: Get Map Finish Request ../pg-metamorphosis.txt 5
+Coordinator: Map Finish ../pg-metamorphosis.txt, left 3
+Coordinator: map 6 ../pg-sherlock_holmes.txt fail
+Coordinator: map 1 ../pg-dorian_gray.txt fail
+Coordinator: map 3 ../pg-grimm.txt fail
+Coordinator: Assign Map 6 ../pg-sherlock_holmes.txt
+Coordinator: Assign Map 1 ../pg-dorian_gray.txt
+Coordinator: Get Map Write Request ../pg-sherlock_holmes.txt 6
+Coordinator: Map Ask For Write ../pg-sherlock_holmes.txt
+Coordinator: Get Map Finish Request ../pg-sherlock_holmes.txt 6
+Coordinator: Map Finish ../pg-sherlock_holmes.txt, left 2
+Coordinator: Assign Map 3 ../pg-grimm.txt
+Coordinator: Get Map Write Request ../pg-dorian_gray.txt 1
+Coordinator: Map Ask For Write ../pg-dorian_gray.txt
+Coordinator: Get Map Finish Request ../pg-dorian_gray.txt 1
+Coordinator: Map Finish ../pg-dorian_gray.txt, left 1
+Coordinator: Get Map Write Request ../pg-sherlock_holmes.txt 6
+Coordinator: Refuse Map Write ../pg-sherlock_holmes.txt, state=3
+Coordinator: map 6 ../pg-sherlock_holmes.txt fail
+Coordinator: Assign Map 6 ../pg-sherlock_holmes.txt
+Coordinator: Get Map Write Request ../pg-sherlock_holmes.txt 6
+Coordinator: Map Ask For Write ../pg-sherlock_holmes.txt
+Coordinator: Get Map Finish Request ../pg-sherlock_holmes.txt 6
+Coordinator: Map Finish ../pg-sherlock_holmes.txt, left 0
+Coordinator: Map All Finish
+Coordinator: Assign reduce 0
+Coordinator: Assign reduce 1
+open mr-3-0: no such file or directory
+open mr-3-1: no such file or directory
+Coordinator: Assign reduce 2
+open mr-3-2: no such file or directory
+Coordinator: Assign reduce 3
+Coordinator: Assign reduce 4
+Coordinator: Assign reduce 5
+open mr-3-3: no such file or directory
+open mr-3-5: no such file or directory
+open mr-3-4: no such file or directory
+Coordinator: map 3 ../pg-grimm.txt fail
+Coordinator: Assign Map 3 ../pg-grimm.txt
+Coordinator: Assign reduce 6
+Coordinator: Assign reduce 7
+open mr-3-6: no such file or directory
+open mr-3-7: no such file or directory
+Coordinator: Get Map Write Request ../pg-grimm.txt 3
+Coordinator: Map Ask For Write ../pg-grimm.txt
+Coordinator: Get Map Finish Request ../pg-grimm.txt 3
+Coordinator: Map Finish ../pg-grimm.txt, left -1
+Coordinator: reduce 2 fail
+Coordinator: reduce 0 fail
+Coordinator: reduce 1 fail
+Coordinator: reduce 3 fail
+Coordinator: reduce 4 fail
+Coordinator: reduce 5 fail
+Coordinator: reduce 6 fail
+Coordinator: reduce 7 fail
+dial-http unix /var/tmp/824-mr-1000: read unix @->/var/tmp/824-mr-1000: read: connection reset by peer
+dial-http unix /var/tmp/824-mr-1000: read unix @->/var/tmp/824-mr-1000: read: connection reset by peer
+dial unix /var/tmp/824-mr-1000: connect: connection refused
