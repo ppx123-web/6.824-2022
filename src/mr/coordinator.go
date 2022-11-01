@@ -42,7 +42,7 @@ const (
 )
 
 func TransitionToDead(item *UsingInfo) {
-	if item.State != WaitForAlloc {
+	if item.State != WaitForAlloc && item.State != FinishWrite {
 		item.State = Dead
 	}
 }
