@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+var workerlogger *log.Logger
+
 // Map functions return a slice of KeyValue.
 type KeyValue struct {
 	Key   string
@@ -30,6 +32,8 @@ func ihash(key string) int {
 func Worker(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
 
+	workerlogger = log.New(ioutil.Discard, "", log.Lshortfile)
+
 	var reply TaskReply
 	var task TaskArg
 	task.Pid = os.Getpid()
@@ -37,19 +41,19 @@ func Worker(mapf func(string, string) []KeyValue,
 		call("Coordinator.AskForTask", &task, &reply)
 		if reply.Tp == Map {
 			reply.Id -= 10
-			// fmt.Printf("Worker:Get Map Task %v, %v\n", reply.Id, reply.File[0])
+			// workerlogger.Printf("Worker:Get Map Task %v, %v\n", reply.Id, reply.File[0])
 			ret := MapWork(mapf, &reply)
 			ret.Pid = task.Pid
 			if len(ret.Input) > 0 {
-				// fmt.Printf("Worker:Finish Map Task\n")
+				// workerlogger.Printf("Worker:Finish Map Task\n")
 				call("Coordinator.FinishMap", &ret, &reply)
 			}
 		} else if reply.Tp == Reduce {
 			reply.Id -= 10
-			// fmt.Printf("Worker:Get Reduce Task %v\n", reply.Id)
+			// workerlogger.Printf("Worker:Get Reduce Task %v\n", reply.Id)
 			ret := ReduceWork(reducef, &reply)
 			ret.Pid = task.Pid
-			// fmt.Printf("Finish Reduce Task\n")
+			// workerlogger.Printf("Finish Reduce Task\n")
 			if ret.Id != -1 {
 				call("Coordinator.FinishReduce", &ret, &reply)
 			} else {
@@ -79,9 +83,7 @@ func MapWork(mapf func(string, string) []KeyValue, arg *TaskReply) MapArg {
 	filename := arg.File[0]
 	file, _ := os.Open(filename)
 	content, err := ioutil.ReadAll(file)
-	if err != nil {
-		log.Fatal("Map Read ", err)
-	}
+	CheckErrorAndExit(err)
 	file.Close()
 
 	kva := mapf(filename, string(content))
@@ -107,7 +109,7 @@ func MapWork(mapf func(string, string) []KeyValue, arg *TaskReply) MapArg {
 	}
 	var reply TaskReply
 	call("Coordinator.MapWrite", &MapArg{Input: arg.File[0], Id: arg.Id, Pid: os.Getpid()}, &reply)
-	// fmt.Printf("Worker:	MapWrite ret  %v %v %v\n", arg.File[0], arg.Id, reply.Tp)
+	// workerlogger.Printf("Worker:	MapWrite ret  %v %v %v\n", arg.File[0], arg.Id, reply.Tp)
 	if reply.Tp == WRITE {
 		for i, v := range values {
 			WriteJson(fmt.Sprintf("mr-%v-%v", arg.Id, i), v)
@@ -195,7 +197,7 @@ func WriteJson(filename string, values map[string][]string) {
 
 func CheckErrorAndExit(err error) {
 	if err != nil {
-		fmt.Printf("%v\n", err)
+		workerlogger.Printf("%v\n", err)
 		os.Exit(1)
 	}
 }
