@@ -60,7 +60,7 @@ func Worker(mapf func(string, string) []KeyValue,
 				break
 			}
 		} else if reply.Tp == WAIT {
-			time.Sleep(time.Microsecond * 300)
+			time.Sleep(time.Millisecond * 300)
 		} else if reply.Tp == FINISH {
 			break
 			// quit when finish
