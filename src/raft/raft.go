@@ -244,7 +244,8 @@ type AppendEntriesReply struct {
 func (rf *Raft) LeaderSendHeartbeats(server int) {
 	rf.mu.Lock()
 	args := AppendEntriesArg{
-		Term: rf.currentTerm,
+		Term:     rf.currentTerm,
+		LeaderId: rf.me,
 	}
 	rf.mu.Unlock()
 	var reply AppendEntriesReply
@@ -265,15 +266,19 @@ func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArg, reply *App
 func (rf *Raft) AppendEntries(args *AppendEntriesArg, reply *AppendEntriesReply) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
+	lastTerm := rf.currentTerm
 	rf.UpdateTerm(args.Term)
 	reply.Term = rf.currentTerm
-	if args.Term > rf.currentTerm {
-		rf.currentTerm = args.Term
-		reply.Success = false
-		return
-	} else {
-		rf.ResetElectionTime()
+	if len(args.Entries) == 0 {
+		//heartbeat
+		if args.Term < lastTerm {
+			reply.Success = false
+			return
+		} else {
+			rf.ResetElectionTime()
+		}
 	}
+
 }
 
 // example code to send a RequestVote RPC to a server.
