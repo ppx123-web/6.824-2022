@@ -11,3 +11,4 @@ mrtmp.*
 /main/mrsequential
 /main/mrworker
 /main/res.txt
+/raft/*.txt
