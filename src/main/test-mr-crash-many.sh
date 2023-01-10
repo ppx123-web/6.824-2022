@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 
 if [ $# -ne 1 ]; then
     echo "Usage: $0 numTrials"
