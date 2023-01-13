@@ -77,6 +77,10 @@ func (rf *Raft) LastLog() LogEntry {
 	return rf.log[len(rf.log)-1]
 }
 
+func (rf *Raft) LogLength() int {
+	return len(rf.log) - 1
+}
+
 func LogUpToDate(lastLogTerm1, lastLogIndex1, lastLogTerm2, lastLogIndex2 int) bool {
 	if lastLogTerm1 == lastLogTerm2 {
 		return lastLogIndex1 <= lastLogIndex2
@@ -267,6 +271,10 @@ type AppendEntriesArg struct {
 type AppendEntriesReply struct {
 	Term    int
 	Success bool
+
+	Conflict      bool
+	ConflictIndex int
+	ConflictTerm  int
 }
 
 func (rf *Raft) LeaderSendHeartbeats(server int) {
@@ -340,11 +348,29 @@ func (rf *Raft) LeaderSendOneEntry(server int, args *AppendEntriesArg) {
 			rf.matchIndex[server] = args.PrevLogIndex + len(args.Entries)
 			rf.LeaderCommit()
 			rf.logger.Println("LeaderSendOneEntry Success: follower", server, "nextIndex", rf.nextIndex[server], args)
-		} else {
+		} else if reply.Conflict {
+			//Conflict
+			if reply.ConflictTerm == -1 {
+				rf.nextIndex[server] = reply.ConflictIndex
+			} else {
+				var newNextIndex = 0
+				for index := rf.LastLogIndex(); index > 0; index-- {
+					if rf.log[index].Term == reply.ConflictTerm {
+						newNextIndex = index + 1
+					}
+				}
+				if newNextIndex != 0 {
+					rf.nextIndex[server] = newNextIndex
+				} else {
+					rf.nextIndex[server] = reply.ConflictIndex
+					// fmt.Println(server, "nextIndex(ConflictIndex)", rf.nextIndex[server], reply.ConflictIndex)
+				}
+			}
+
 			// If AppendEntries fails because of log inconsistency: decrement nextIndex and retry
 			rf.logger.Println("LeaderSendOneEntry Fail: follower", server)
 			//decrement
-			rf.nextIndex[server] -= 1
+			// rf.nextIndex[server] -= 1
 			//retry
 			nextIndex := rf.nextIndex[server]
 			prevLog := rf.log[nextIndex-1]
@@ -358,6 +384,8 @@ func (rf *Raft) LeaderSendOneEntry(server int, args *AppendEntriesArg) {
 			}
 			copy(newargs.Entries, rf.log[nextIndex:])
 			go rf.LeaderSendOneEntry(server, &newargs)
+		} else {
+			//Fail do noting
 		}
 
 	}
@@ -396,26 +424,34 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArg, reply *AppendEntriesReply)
 	lastTerm := rf.currentTerm
 	rf.UpdateTerm(args.Term)
 	reply.Term = rf.currentTerm
+	reply.Conflict = false
 	if args.Term < lastTerm {
 		//Reply false if term < currentTerm
 		reply.Success = false
 		return
 	}
-	// if len(args.Entries) == 0 {
-	// 	//heartbeat
-	// 	// rule 5
-	// 	// If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
-	// 	if args.LeaderCommit > rf.commitIndex {
-	// 		rf.commitIndex = min(args.LeaderCommit, rf.LastLogIndex())
-	// 		rf.logger.Println("HeartBeat Set commitIdex to", rf.commitIndex, ",LastLogIndex", rf.LastLogIndex())
-	// 	}
-	// 	return
-	// } else {
+	if rf.state == Candidate {
+		rf.state = Follower
+	}
 	rf.ResetElectionTime()
 	//append entries
 	//rule 2: Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm
 	if rf.LastLogIndex() < args.PrevLogIndex || rf.log[args.PrevLogIndex].Term != args.PrevLogTerm {
 		reply.Success = false
+		reply.Conflict = true
+		if rf.LastLogIndex() < args.PrevLogIndex {
+			reply.ConflictIndex = rf.LogLength()
+			reply.ConflictTerm = -1
+		} else {
+			reply.ConflictTerm = rf.log[args.PrevLogIndex].Term
+			reply.ConflictIndex = 1
+			for index := args.PrevLogIndex; index > 0; index-- {
+				if rf.log[index].Term == reply.ConflictTerm {
+					reply.ConflictIndex = index
+					break
+				}
+			}
+		}
 		rf.logger.Println("log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm")
 		return
 	}
@@ -445,7 +481,6 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArg, reply *AppendEntriesReply)
 		rf.logger.Println("Set commitIdex to", rf.commitIndex)
 	}
 	reply.Success = true
-	// }
 
 }
 
