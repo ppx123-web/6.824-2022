@@ -33,6 +33,14 @@ import (
 	"6.824/labrpc"
 )
 
+func min(a, b int) int {
+	if a < b {
+		return a
+	} else {
+		return b
+	}
+}
+
 // as each Raft peer becomes aware that successive log entries are
 // committed, the peer should send an ApplyMsg to the service (or
 // tester) on the same server, via the applyCh passed to Make(). set
@@ -62,11 +70,11 @@ type LogEntry struct {
 }
 
 func (rf *Raft) LastLogIndex() int {
-	return rf.log[len(rf.log) - 1].Index
+	return rf.log[len(rf.log)-1].Index
 }
 
 func (rf *Raft) LastLog() LogEntry {
-	return rf.log[rf.LastLogIndex()]
+	return rf.log[len(rf.log)-1]
 }
 
 func LogUpToDate(lastLogTerm1, lastLogIndex1, lastLogTerm2, lastLogIndex2 int) bool {
@@ -263,10 +271,23 @@ type AppendEntriesReply struct {
 
 func (rf *Raft) LeaderSendHeartbeats(server int) {
 	rf.mu.Lock()
-	args := AppendEntriesArg{
-		Term:     rf.currentTerm,
-		LeaderId: rf.me,
+	nextIndex := rf.nextIndex[server]
+	if nextIndex == 0 {
+		nextIndex = 1
 	}
+	if rf.LastLogIndex()+1 < nextIndex {
+		nextIndex = rf.LastLogIndex() + 1
+	}
+	prevLog := rf.log[nextIndex-1]
+	var args = AppendEntriesArg{
+		Term:         rf.currentTerm,
+		LeaderId:     rf.me,
+		PrevLogIndex: nextIndex - 1,
+		PrevLogTerm:  prevLog.Term,
+		Entries:      make([]LogEntry, rf.LastLogIndex()-nextIndex+1),
+		LeaderCommit: rf.commitIndex,
+	}
+	copy(args.Entries, rf.log[nextIndex:])
 	rf.mu.Unlock()
 	var reply AppendEntriesReply
 	rf.sendAppendEntries(server, &args, &reply)
@@ -282,6 +303,7 @@ func (rf *Raft) LeaderSendEntries() {
 	for id := range rf.peers {
 		if id == rf.me {
 			rf.ResetElectionTime()
+			continue
 		}
 		nextIndex := rf.nextIndex[id]
 		if rf.LastLogIndex() >= nextIndex {
@@ -303,28 +325,64 @@ func (rf *Raft) LeaderSendEntries() {
 
 func (rf *Raft) LeaderSendOneEntry(server int, args *AppendEntriesArg) {
 	var reply AppendEntriesReply
+	rf.logger.Println("Leader", rf.me, "sends entry to", server)
 	ok := rf.sendAppendEntries(server, args, &reply)
 	if ok {
 		rf.mu.Lock()
 		defer rf.mu.Unlock()
+		if reply.Term > rf.currentTerm {
+			rf.UpdateTerm(reply.Term)
+			return
+		}
 		if reply.Success {
-			rf.nextIndex[server] = len(rf.log)
-			rf.matchIndex[server] = len(rf.log) - 1
+			// TODO
+			rf.nextIndex[server] = args.PrevLogIndex + len(args.Entries) + 1
+			rf.matchIndex[server] = args.PrevLogIndex + len(args.Entries)
+			rf.LeaderCommit()
+			rf.logger.Println("LeaderSendOneEntry Success: follower", server, "nextIndex", rf.nextIndex[server], args)
 		} else {
 			// If AppendEntries fails because of log inconsistency: decrement nextIndex and retry
+			rf.logger.Println("LeaderSendOneEntry Fail: follower", server)
 			//decrement
 			rf.nextIndex[server] -= 1
 			//retry
 			nextIndex := rf.nextIndex[server]
 			prevLog := rf.log[nextIndex-1]
-			args.PrevLogIndex = nextIndex - 1
-			args.PrevLogTerm = prevLog.Term
-			args.Entries = make([]LogEntry, rf.LastLogIndex()-nextIndex+1)
-			copy(args.Entries, rf.log[nextIndex:])
-			go rf.LeaderSendOneEntry(server, args)
+			var newargs = AppendEntriesArg{
+				Term:         rf.currentTerm,
+				LeaderId:     rf.me,
+				PrevLogIndex: nextIndex - 1,
+				PrevLogTerm:  prevLog.Term,
+				Entries:      make([]LogEntry, rf.LastLogIndex()-nextIndex+1),
+				LeaderCommit: rf.commitIndex,
+			}
+			copy(newargs.Entries, rf.log[nextIndex:])
+			go rf.LeaderSendOneEntry(server, &newargs)
 		}
+
 	}
 
+}
+
+func (rf *Raft) LeaderCommit() {
+	if rf.state == Leader {
+		commit := rf.commitIndex
+		rf.logger.Println("Leader commit, begin", commit+1)
+		for n := commit + 1; n <= rf.LastLogIndex(); n++ {
+			sum := 1
+			for id := range rf.peers {
+				if id != rf.me && rf.matchIndex[id] >= n && rf.log[n].Term == rf.currentTerm {
+					sum += 1
+				}
+			}
+			if sum > len(rf.peers)/2 {
+				rf.logger.Println("Leader commit success", n)
+				rf.commitIndex = n
+			} else {
+				// rf.logger.Println("Leader commit fail, get", sum)
+			}
+		}
+	}
 }
 
 func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArg, reply *AppendEntriesReply) bool {
@@ -338,25 +396,56 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArg, reply *AppendEntriesReply)
 	lastTerm := rf.currentTerm
 	rf.UpdateTerm(args.Term)
 	reply.Term = rf.currentTerm
-	if len(args.Entries) == 0 {
-		//heartbeat
-		if args.Term < lastTerm {
-			reply.Success = false
-			return
-		} else {
-			rf.ResetElectionTime()
-		}
-	} else {
-		//append entries
-		if rf.LastLogIndex() < args.PrevLogIndex || rf.log[args.PrevLogIndex].Term != args.PrevLogTerm {
-			reply.Success = false
-			return
-		}
-		for id, entry := range args.Entries {
-			if entry.Term != rf.log[args.PrevLogIndex + id]
-		}
-
+	if args.Term < lastTerm {
+		//Reply false if term < currentTerm
+		reply.Success = false
+		return
 	}
+	// if len(args.Entries) == 0 {
+	// 	//heartbeat
+	// 	// rule 5
+	// 	// If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
+	// 	if args.LeaderCommit > rf.commitIndex {
+	// 		rf.commitIndex = min(args.LeaderCommit, rf.LastLogIndex())
+	// 		rf.logger.Println("HeartBeat Set commitIdex to", rf.commitIndex, ",LastLogIndex", rf.LastLogIndex())
+	// 	}
+	// 	return
+	// } else {
+	rf.ResetElectionTime()
+	//append entries
+	//rule 2: Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm
+	if rf.LastLogIndex() < args.PrevLogIndex || rf.log[args.PrevLogIndex].Term != args.PrevLogTerm {
+		reply.Success = false
+		rf.logger.Println("log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm")
+		return
+	}
+	//rule 3
+	// If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it
+	nextIndex := len(args.Entries)
+	// rf.logger.Println("AppendEntry", args.Entries)
+	for id, entry := range args.Entries {
+		curId := args.PrevLogIndex + 1 + id
+		if curId > rf.LastLogIndex() || (entry.Index == rf.log[curId].Index && entry.Term != rf.log[curId].Term) {
+			rf.log = rf.log[:curId]
+			nextIndex = id
+			break
+		}
+	}
+
+	// rf.logger.Println("AppendEntry", nextIndex)
+	// rule 4: Append any new entries not already in the log
+	for index := nextIndex; index < len(args.Entries); index++ {
+		rf.log = append(rf.log, args.Entries[index])
+	}
+	// rf.logger.Println("log set to", rf.log)
+	// rule 5
+	// If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
+	if args.LeaderCommit > rf.commitIndex {
+		rf.commitIndex = min(args.LeaderCommit, rf.LastLog().Index)
+		rf.logger.Println("Set commitIdex to", rf.commitIndex)
+	}
+	reply.Success = true
+	// }
 
 }
 
@@ -450,26 +539,22 @@ func (rf *Raft) killed() bool {
 
 func (rf *Raft) applier() {
 	for !rf.killed() {
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 		rf.mu.Lock()
-		if rf.state == Leader && rf.commitIndex > rf.lastApplied {
-			commit := rf.commitIndex
-			for n := commit + 1; n <= rf.LastLogIndex(); n++ {
-				sum := 0
-				for id := range rf.peers {
-					if id != rf.me && rf.matchIndex[id] >= n && rf.log[n].Term == rf.currentTerm {
-						sum += 1
-					}
+		for {
+			if rf.commitIndex > rf.lastApplied {
+				rf.lastApplied += 1
+				var msg = ApplyMsg{
+					CommandValid: true,
+					Command:      rf.log[rf.lastApplied].Commands,
+					CommandIndex: rf.lastApplied,
 				}
-				if n >= len(rf.peers)/2 {
-					rf.lastApplied += 1
-					rf.applyCh <- ApplyMsg{
-						CommandValid: true,
-						Command:      rf.log[n].Commands,
-						CommandIndex: rf.lastApplied,
-					}
-					rf.commitIndex = n
-				}
+				rf.logger.Println("Server", rf.me, "apply", rf.lastApplied, msg.Command)
+				rf.mu.Unlock()
+				rf.applyCh <- msg
+				rf.mu.Lock()
+			} else {
+				break
 			}
 		}
 		rf.mu.Unlock()
@@ -590,15 +675,15 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.leader = -1
 	rf.state = Follower
 	rf.heartbeat = 100 * time.Millisecond //less than 10 heartbeats per second
-	rf.log = append(rf.log, LogEntry{Term: 0})
+	rf.log = append(rf.log, LogEntry{Term: 0, Index: 0})
 	rf.ResetElectionTime()
 
 	rf.commitIndex = 0
 	rf.lastApplied = 0
 
 	rf.applyCh = applyCh
-	f, _ := os.OpenFile("log.txt", os.O_CREATE|os.O_RDWR|os.O_APPEND, os.ModePerm)
 
+	f, _ := os.OpenFile("log.txt", os.O_CREATE|os.O_RDWR|os.O_APPEND, os.ModePerm)
 	rf.logger = log.New(f, "", log.Lshortfile)
 	rf.logger.SetPrefix("[" + strconv.Itoa(rf.me) + "] ")
 	// initialize from state persisted before a crash
