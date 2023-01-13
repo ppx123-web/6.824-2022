@@ -10,21 +10,27 @@ trap 'kill -INT -$pid; exit 1' INT
 runs=$1
 tests=$2
 log=log.txt
+test=test.txt
+
+rm $test
 
 for i in $(seq 1 $runs); do
     echo '***' TEST $i STARTS
+    echo '***' TEST $i STARTS >> $test
     rm $log
-    time go test -run $2 &
+    time go test -run $2 >> $test &
     pid=$!
     if ! wait $pid; then
         echo '***' FAILED TESTS IN TRIAL $i
         exit 1
     else
-        if [ `grep -c "FAIL" $log` -ne '0' ]; then 
-            echo '***' TEST $i FAILED
+        if [ `grep -c "FAIL" $test` -ne '0' ]; then 
+            echo '***' TEST $i FAILED 
+            echo '***' TEST $i FAILED >> $test
             exit 1
         else
             echo '***' TEST $i PASSED
+            echo '***' TEST $i PASSED >> $test
         fi
     fi
 done
