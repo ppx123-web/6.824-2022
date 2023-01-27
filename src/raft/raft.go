@@ -333,14 +333,7 @@ func (rf *Raft) LeaderSendHeartbeats(server int) {
 		return
 	}
 	rf.mu.Unlock()
-	var reply AppendEntriesReply
-	rf.sendAppendEntries(server, &args, &reply)
-
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-	if rf.state == Leader && rf.UpdateTerm(reply.Term) {
-		rf.state = Follower
-	}
+	rf.LeaderSendOneEntry(server, &args)
 }
 
 func (rf *Raft) LeaderSendEntries() {
@@ -423,7 +416,7 @@ func (rf *Raft) LeaderSendOneEntry(server int, args *AppendEntriesArg) {
 				LeaderCommit: rf.commitIndex,
 			}
 			copy(newargs.Entries, rf.log[nextIndex:])
-			DebugLog(dLog, "S%d T%d -> S%d Retry AppEnt PLI: %d PLT %d LC: %d ", rf.me, rf.currentTerm, server, newargs.PrevLogIndex, newargs.PrevLogTerm, newargs.LeaderCommit)
+			DebugLog(dDrop, "S%d T%d -> S%d Retry AppEnt PLI: %d PLT %d LC: %d ", rf.me, rf.currentTerm, server, newargs.PrevLogIndex, newargs.PrevLogTerm, newargs.LeaderCommit)
 			go rf.LeaderSendOneEntry(server, &newargs)
 		}
 		// } else {
