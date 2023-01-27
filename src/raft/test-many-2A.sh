@@ -12,6 +12,8 @@ tests=$2
 log=log.txt
 test=test.txt
 
+testcases=(Persist12C Persist22C Persist32C Figure82C UnreliableAgree2C Figure8Unreliable2C ReliableChurn2C UnreliableChurn2C)
+
 rm $test
 
 for i in $(seq 1 $runs); do
