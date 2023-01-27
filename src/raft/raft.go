@@ -353,7 +353,6 @@ func (rf *Raft) LeaderSendOneEntry(server int, args *AppendEntriesArg) {
 			rf.nextIndex[server] = args.PrevLogIndex + len(args.Entries) + 1
 			rf.matchIndex[server] = args.PrevLogIndex + len(args.Entries)
 			rf.LeaderCommit()
-			// DebugLog("LeaderSendOneEntry Success: follower", server, "nextIndex", rf.nextIndex[server])
 		} else if reply.Conflict {
 			//Conflict
 			if reply.ConflictTerm == -1 {
