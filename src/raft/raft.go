@@ -303,9 +303,10 @@ type AppendEntriesReply struct {
 	Term    int
 	Success bool
 
-	Conflict      bool
-	ConflictIndex int
-	ConflictTerm  int
+	Conflict bool
+	XTerm    int
+	XIndex   int
+	XLen     int
 }
 
 func (rf *Raft) LeaderSendHeartbeats(server int) {
@@ -389,12 +390,12 @@ func (rf *Raft) LeaderSendOneEntry(server int, args *AppendEntriesArg) {
 			rf.LeaderCommit()
 		} else if reply.Conflict {
 			//Conflict
-			if reply.ConflictTerm == -1 {
-				rf.nextIndex[server] = reply.ConflictIndex
+			if reply.XTerm == -1 {
+				rf.nextIndex[server] = reply.XLen + 1
 			} else {
 				var newNextIndex = 0
-				for index := rf.LastLogIndex(); index > 0; index-- {
-					if rf.log[index].Term == reply.ConflictTerm {
+				for index := args.PrevLogIndex; index > 0; index-- {
+					if rf.log[index].Term == reply.XTerm {
 						newNextIndex = index + 1
 						break
 					}
@@ -402,8 +403,7 @@ func (rf *Raft) LeaderSendOneEntry(server int, args *AppendEntriesArg) {
 				if newNextIndex != 0 {
 					rf.nextIndex[server] = newNextIndex
 				} else {
-					rf.nextIndex[server] = reply.ConflictIndex
-					// fmt.Println(server, "nextIndex(ConflictIndex)", rf.nextIndex[server], reply.ConflictIndex)
+					rf.nextIndex[server] = reply.XIndex
 				}
 			}
 
@@ -479,19 +479,19 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArg, reply *AppendEntriesReply)
 		reply.Success = false
 		reply.Conflict = true
 		if rf.LastLogIndex() < args.PrevLogIndex {
-			reply.ConflictIndex = rf.LogLength()
-			reply.ConflictTerm = -1
+			reply.XLen = rf.LogLength()
+			reply.XTerm = -1
 		} else {
-			reply.ConflictTerm = rf.log[args.PrevLogIndex].Term
-			reply.ConflictIndex = 1
+			reply.XTerm = rf.log[args.PrevLogIndex].Term
+			reply.XIndex = 1
 			for index := args.PrevLogIndex; index > 0; index-- {
-				if rf.log[index].Term == reply.ConflictTerm {
-					reply.ConflictIndex = index
+				if rf.log[index].Term != reply.XTerm {
+					reply.XIndex = index + 1
 					break
 				}
 			}
 		}
-		DebugLog(dLog2, "S%d T%d -> S%d T%d ,AppEnt PLI %d PLT %d conflict, ConflictArg: Term:%d, Index:%d", rf.me, rf.currentTerm, args.LeaderId, args.Term, args.PrevLogIndex, args.PrevLogTerm, reply.ConflictTerm, reply.ConflictIndex)
+		DebugLog(dLog2, "S%d T%d -> S%d T%d ,AppEnt PLI %d PLT %d conflict, ConflictArg: Term:%d, Index:%d", rf.me, rf.currentTerm, args.LeaderId, args.Term, args.PrevLogIndex, args.PrevLogTerm, reply.XTerm, reply.XIndex)
 		return
 	}
 	//rule 3
