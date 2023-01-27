@@ -622,9 +622,9 @@ func (rf *Raft) applier() {
 					CommandIndex: rf.lastApplied,
 				}
 				if rf.state == Leader {
-					DebugLog(dTimer, "S%d T%d (Leader) apply index %d", rf.me, rf.currentTerm, rf.lastApplied)
+					DebugLog(dTimer, "S%d T%d (Leader) apply index %d, cmd %v", rf.me, rf.currentTerm, rf.lastApplied, msg.Command)
 				} else {
-					DebugLog(dTimer, "S%d T%d (Follower) apply index %d", rf.me, rf.currentTerm, rf.lastApplied)
+					DebugLog(dTimer, "S%d T%d (Follower) apply index %d, cmd %v", rf.me, rf.currentTerm, rf.lastApplied, msg.Command)
 				}
 				// if rf.log[rf.lastApplied].Term != rf.currentTerm {
 				// 	continue
@@ -709,6 +709,9 @@ func (rf *Raft) CandidateRequestVotes(index int, votes *int, args *RequestVoteAr
 
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
+	if ok && rf.UpdateTerm(reply.Term) {
+		return
+	}
 	if ok && reply.VoteGranted {
 		*votes += 1
 		DebugLog(dVote, "S%d T%d <- S%d T%d Get Vote", args.CandidateId, args.Term, index, reply.Term)
@@ -725,9 +728,6 @@ func (rf *Raft) CandidateRequestVotes(index int, votes *int, args *RequestVoteAr
 			rf.doLeader()
 			DebugLog(dLeader, "S%d T%d Finish heartbeats after election", rf.me, rf.currentTerm)
 		}
-	} else {
-		rf.UpdateTerm(reply.Term)
-		return
 	}
 }
 
