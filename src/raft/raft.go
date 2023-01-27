@@ -20,6 +20,7 @@ package raft
 import (
 	//	"bytes"
 
+	"bytes"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -27,6 +28,7 @@ import (
 
 	//	"6.824/labgob"
 
+	"6.824/labgob"
 	"6.824/labrpc"
 )
 
@@ -139,6 +141,7 @@ func (rf *Raft) UpdateTerm(term int) bool {
 		rf.currentTerm = term
 		rf.state = Follower
 		rf.votedFor = -1
+		rf.persist()
 		return true
 	}
 	return false
@@ -169,6 +172,19 @@ func (rf *Raft) persist() {
 	// e.Encode(rf.yyy)
 	// data := w.Bytes()
 	// rf.persister.SaveRaftState(data)
+	w := new(bytes.Buffer)
+	e := labgob.NewEncoder(w)
+	e1 := e.Encode(rf.currentTerm)
+	e2 := e.Encode(rf.votedFor)
+	e3 := e.Encode(rf.log)
+	if e1 != nil || e2 != nil || e3 != nil {
+		DebugLog(dPersist, "S%d T%d persist fail, %v %v %v", rf.me, rf.currentTerm, e1, e2, e3)
+	} else {
+		data := w.Bytes()
+		rf.persister.SaveRaftState(data)
+		DebugLog(dPersist, "S%d T%d persist success, Log %d", rf.me, rf.currentTerm, rf.LogLength())
+	}
+
 }
 
 // restore previously persisted state.
@@ -189,6 +205,23 @@ func (rf *Raft) readPersist(data []byte) {
 	//   rf.xxx = xxx
 	//   rf.yyy = yyy
 	// }
+	r := bytes.NewBuffer(data)
+	d := labgob.NewDecoder(r)
+	var currentTerm int
+	var votedFor int
+	var log []LogEntry
+	e1 := d.Decode(&currentTerm)
+	e2 := d.Decode(&votedFor)
+	e3 := d.Decode(&log)
+	if e1 != nil || e2 != nil || e3 != nil {
+		DebugLog(dPersist, "S%d T%d Read persistant fails, T:%v V:%v L:%v", rf.me, rf.currentTerm, e1, e2, e3)
+	} else {
+		rf.currentTerm = currentTerm
+		rf.votedFor = votedFor
+		rf.log = append(rf.log[:0], log...)
+		DebugLog(dPersist, "S%d T%d Read persistant Success, log length %d", rf.me, rf.currentTerm, rf.LogLength())
+	}
+
 }
 
 // A service wants to switch to snapshot.  Only do so if Raft hasn't
@@ -243,6 +276,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	if (rf.votedFor == -1 || rf.votedFor == args.CandidateId) && LogUpToDate(rf.LastLog().Term, rf.LastLogIndex(), args.LastLogTerm, args.LastLogIndex) {
 		reply.VoteGranted = true
 		rf.votedFor = args.CandidateId
+		rf.persist()
 	} else {
 		reply.VoteGranted = false
 	}
@@ -250,7 +284,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 	if reply.VoteGranted {
 		rf.ResetElectionTime()
-		DebugLog(dVote, "S%d -> S%d T%d, Granting Vot at T%d", rf.me, args.CandidateId, rf.currentTerm)
+		DebugLog(dVote, "S%d -> S%d T%d, Granting Vot", rf.me, args.CandidateId, rf.currentTerm)
 	} else {
 		DebugLog(dVote, "S%d Has voted for S%d at T%d", rf.me, rf.votedFor, rf.currentTerm)
 	}
@@ -362,6 +396,7 @@ func (rf *Raft) LeaderSendOneEntry(server int, args *AppendEntriesArg) {
 				for index := rf.LastLogIndex(); index > 0; index-- {
 					if rf.log[index].Term == reply.ConflictTerm {
 						newNextIndex = index + 1
+						break
 					}
 				}
 				if newNextIndex != 0 {
@@ -456,7 +491,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArg, reply *AppendEntriesReply)
 				}
 			}
 		}
-		DebugLog(dLog2, "S%d T%d -> S%d T%d ,AppEnt PLI %d PLT %d conflict", rf.me, rf.currentTerm, args.LeaderId, args.Term, args.PrevLogIndex, args.PrevLogTerm)
+		DebugLog(dLog2, "S%d T%d -> S%d T%d ,AppEnt PLI %d PLT %d conflict, ConflictArg: Term:%d, Index:%d", rf.me, rf.currentTerm, args.LeaderId, args.Term, args.PrevLogIndex, args.PrevLogTerm, reply.ConflictTerm, reply.ConflictIndex)
 		return
 	}
 	//rule 3
@@ -475,11 +510,17 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArg, reply *AppendEntriesReply)
 	for index := nextIndex; index < len(args.Entries); index++ {
 		rf.log = append(rf.log, args.Entries[index])
 	}
+	rf.persist()
 	// rule 5
 	// If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
 	if args.LeaderCommit > rf.commitIndex {
 		rf.commitIndex = min(args.LeaderCommit, args.PrevLogIndex+len(args.Entries))
 		DebugLog(dLog2, "S%d T%d Resetting commitIndex %d", rf.me, rf.currentTerm, rf.commitIndex)
+	}
+	if len(args.Entries) == 0 {
+		DebugLog(dLog2, "S%d T%d Reply heartbeats True", rf.me, rf.currentTerm)
+	} else {
+		DebugLog(dLog2, "S%d T%d Reply AppEnt Success True", rf.me, rf.currentTerm)
 	}
 	reply.Success = true
 
@@ -550,6 +591,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		Index:    index,
 	}
 	rf.log = append(rf.log, newLog)
+	rf.persist()
 	rf.LeaderSendEntries()
 	return index, term, isLeader
 }
@@ -631,7 +673,7 @@ func (rf *Raft) ticker() {
 func (rf *Raft) doFollower() {
 	if time.Now().After(rf.electionTime) {
 		rf.state = Candidate
-		DebugLog(dTimer, "S%d T%d Follower -> Candidate", rf.me, rf.currentTerm)
+		DebugLog(dLeader, "S%d T%d Follower -> Candidate", rf.me, rf.currentTerm)
 	}
 }
 
@@ -639,6 +681,7 @@ func (rf *Raft) doCandidate() {
 	if time.Now().After(rf.electionTime) {
 		rf.votedFor = rf.me
 		rf.currentTerm += 1
+		rf.persist()
 		rf.ResetElectionTime()
 		votes := 1
 		arg := &RequestVoteArgs{
@@ -667,7 +710,6 @@ func (rf *Raft) doLeader() {
 }
 
 func (rf *Raft) CandidateRequestVotes(index int, votes *int, args *RequestVoteArgs, isleader *bool) {
-	// rf.logger.Println("Send RequestVote to", index)
 	var reply RequestVoteReply
 	ok := rf.sendRequestVote(index, args, &reply)
 
@@ -687,7 +729,7 @@ func (rf *Raft) CandidateRequestVotes(index int, votes *int, args *RequestVoteAr
 			}
 			DebugLog(dLeader, "S%d T%d Candidate -> Leader", rf.me, rf.currentTerm)
 			rf.doLeader()
-			DebugLog(dLeader, "S%d T%d heartbeats after election", rf.me, rf.currentTerm)
+			DebugLog(dLeader, "S%d T%d Finish heartbeats after election", rf.me, rf.currentTerm)
 		}
 	} else {
 		rf.UpdateTerm(reply.Term)
@@ -717,7 +759,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.leader = -1
 	rf.state = Follower
 	rf.heartbeat = 100 * time.Millisecond //less than 10 heartbeats per second
-	rf.log = append(rf.log, LogEntry{Term: 0, Index: 0})
+	rf.log = append(rf.log, LogEntry{Term: 0, Index: 0, Commands: 0})
 	rf.ResetElectionTime()
 
 	rf.commitIndex = 0
