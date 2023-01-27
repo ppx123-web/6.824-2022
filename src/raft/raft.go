@@ -423,6 +423,7 @@ func (rf *Raft) LeaderSendOneEntry(server int, args *AppendEntriesArg) {
 				LeaderCommit: rf.commitIndex,
 			}
 			copy(newargs.Entries, rf.log[nextIndex:])
+			DebugLog(dLog, "S%d T%d -> S%d Retry AppEnt PLI: %d PLT %d LC: %d ", rf.me, rf.currentTerm, server, newargs.PrevLogIndex, newargs.PrevLogTerm, newargs.LeaderCommit)
 			go rf.LeaderSendOneEntry(server, &newargs)
 		}
 		// } else {
