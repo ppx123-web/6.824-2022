@@ -712,7 +712,7 @@ func (rf *Raft) CandidateRequestVotes(index int, votes *int, args *RequestVoteAr
 	if ok && rf.UpdateTerm(reply.Term) {
 		return
 	}
-	if ok && reply.VoteGranted {
+	if ok && reply.VoteGranted && reply.Term == rf.currentTerm {
 		*votes += 1
 		DebugLog(dVote, "S%d T%d <- S%d T%d Get Vote", args.CandidateId, args.Term, index, reply.Term)
 		if *votes > len(rf.peers)/2 && !(*isleader) && rf.state == Candidate {
