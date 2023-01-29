@@ -65,8 +65,8 @@ func init() {
 
 func DebugLog(topic logTopic, format string, a ...interface{}) {
 	if debugVerbosity >= 1 {
-		f, _ := os.OpenFile("log.txt", os.O_CREATE|os.O_RDWR|os.O_APPEND, os.ModePerm)
-		log.SetOutput(f)
+		// f, _ := os.OpenFile("log.txt", os.O_CREATE|os.O_RDWR|os.O_APPEND, os.ModePerm)
+		// log.SetOutput(f)
 		time := time.Since(debugStart).Microseconds()
 		time /= 100
 		prefix := fmt.Sprintf("%06d %v ", time, string(topic))
