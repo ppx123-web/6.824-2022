@@ -40,6 +40,14 @@ func min(a, b int) int {
 	}
 }
 
+func max(a, b int) int {
+	if a < b {
+		return b
+	} else {
+		return a
+	}
+}
+
 // as each Raft peer becomes aware that successive log entries are
 // committed, the peer should send an ApplyMsg to the service (or
 // tester) on the same server, via the applyCh passed to Make(). set
@@ -103,6 +111,9 @@ func (l *Logs) LogIndexMap(index int) LogEntry {
 	if index == l.Start {
 		return LogEntry{Term: l.StartTerm, Index: l.Start}
 	}
+	if index-l.Start-1 < 0 {
+		DebugLog(dError, "Wrong Log Start %d, Index %d", l.Start, index)
+	}
 	return l.Log[index-l.Start-1]
 }
 
@@ -124,6 +135,7 @@ func (l *Logs) LogAllocate(term int, cmd interface{}) {
 
 func (l *Logs) LogCopy(src *Logs) {
 	l.Start = src.Start
+	l.StartTerm = src.StartTerm
 	l.Log = make([]LogEntry, src.LogLength())
 	copy(l.Log, src.Log)
 }
@@ -168,9 +180,11 @@ type Raft struct {
 	electionTime time.Time
 
 	//Persistent state on all servers
-	currentTerm int
-	votedFor    int
-	log         Logs
+	currentTerm       int
+	votedFor          int
+	log               Logs
+	lastIncludedTerm  int
+	lastIncludedIndex int
 
 	// Volatile state on all servers
 	commitIndex int //index of highest log entry known to be committed (initialized to 0, increases monotonically)
@@ -221,13 +235,6 @@ func (rf *Raft) GetState() (int, bool) {
 // see paper's Figure 2 for a description of what should be persistent.
 func (rf *Raft) persist() {
 	// Your code here (2C).
-	// Example:
-	// w := new(bytes.Buffer)
-	// e := labgob.NewEncoder(w)
-	// e.Encode(rf.xxx)
-	// e.Encode(rf.yyy)
-	// data := w.Bytes()
-	// rf.persister.SaveRaftState(data)
 	w := new(bytes.Buffer)
 	e := labgob.NewEncoder(w)
 	e1 := e.Encode(rf.currentTerm)
@@ -249,18 +256,6 @@ func (rf *Raft) readPersist(data []byte) {
 		return
 	}
 	// Your code here (2C).
-	// Example:
-	// r := bytes.NewBuffer(data)
-	// d := labgob.NewDecoder(r)
-	// var xxx
-	// var yyy
-	// if d.Decode(&xxx) != nil ||
-	//    d.Decode(&yyy) != nil {
-	//   error...
-	// } else {
-	//   rf.xxx = xxx
-	//   rf.yyy = yyy
-	// }
 	r := bytes.NewBuffer(data)
 	d := labgob.NewDecoder(r)
 	var currentTerm int
@@ -275,6 +270,8 @@ func (rf *Raft) readPersist(data []byte) {
 		rf.currentTerm = currentTerm
 		rf.votedFor = votedFor
 		rf.log.LogCopy(&log)
+		// rf.commitIndex = rf.log.Start
+		// rf.lastApplied = rf.log.Start
 		DebugLog(dPersist, "S%d T%d Read persistant Success, log length %d", rf.me, rf.currentTerm, rf.log.LogLength())
 	}
 
@@ -306,6 +303,16 @@ func (rf *Raft) InstallSnapshot(args InstallSnapshotArg, reply InstallSnapshotRe
 	if rf.UpdateTerm(args.Term) {
 		return
 	}
+	// var log Logs
+	// r := bytes.NewBuffer(rf.persister.ReadSnapshot())
+	// d := labgob.NewDecoder(r)
+	// d.Decode(&log)
+	// prevLastIncludeIndex := log.Start
+	// if args.LastIncludedIndex < prevLastIncludeIndex {
+	// 	w := new(bytes.Buffer)
+	// 	e := labgob.NewEncoder(w)
+	// 	e1 := e.Encode(args.LastIncludedIndex)
+	// }
 
 }
 
@@ -325,13 +332,28 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	// Your code here (2D).
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	newStart := index
-	tmpLogs := Logs{
-		Log:   rf.log.LogToEnd(newStart),
-		Start: newStart,
+	if index > rf.log.Start {
+		newStart := index
+		tmpLogs := Logs{
+			Log:       rf.log.LogToEnd(newStart + 1),
+			Start:     newStart,
+			StartTerm: rf.log.LogIndexMap(newStart).Term,
+		}
+		rf.log.LogCopy(&tmpLogs)
+		DebugLog(dSnap, "S%d T%d Snapshot index %d, log start at %d", rf.me, rf.currentTerm, index, rf.log.Start)
+
+		// w := new(bytes.Buffer)
+		// e := labgob.NewEncoder(w)
+		// e1 := e.Encode(snapshot)
+		// e2 := e.Encode(index)
+		// if e1 == nil && e2 == nil {
+
+		// } else {
+		// 	DebugLog(dError, "S%d T%d Encode Snapshot Error", rf.me, rf.currentTerm)
+		// }
+
 	}
-	rf.log.LogCopy(&tmpLogs)
-	DebugLog(dSnap, "S%d T%d Snapshot index %d, log start at %d", rf.me, rf.currentTerm, index, rf.log.Start)
+
 }
 
 // example RequestVote RPC arguments structure.
@@ -472,8 +494,9 @@ func (rf *Raft) LeaderSendOneEntry(server int, args *AppendEntriesArg) {
 		}
 		if reply.Success {
 			// TODO
-			rf.nextIndex[server] = args.PrevLogIndex + len(args.Entries) + 1
-			rf.matchIndex[server] = args.PrevLogIndex + len(args.Entries)
+			rf.nextIndex[server] = max(rf.nextIndex[server], args.PrevLogIndex+len(args.Entries)+1)
+			rf.matchIndex[server] = max(rf.matchIndex[server], args.PrevLogIndex+len(args.Entries))
+			DebugLog(dLog2, "S%d T%d Set S%d nextIndex to %d", rf.me, rf.currentTerm, server, rf.nextIndex[server])
 			rf.LeaderCommit()
 		} else if reply.Conflict {
 			//Conflict
@@ -561,6 +584,13 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArg, reply *AppendEntriesReply)
 		rf.state = Follower
 	}
 	rf.ResetElectionTime()
+
+	if args.PrevLogIndex < rf.log.Start {
+		reply.Success = false
+		reply.Conflict = false
+		return
+	}
+
 	//append entries
 	//rule 2: Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm
 	if rf.log.LastLogIndex() < args.PrevLogIndex || rf.log.LogIndexMap(args.PrevLogIndex).Term != args.PrevLogTerm {
@@ -579,7 +609,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArg, reply *AppendEntriesReply)
 				}
 			}
 		}
-		DebugLog(dLog2, "S%d T%d -> S%d T%d ,AppEnt PLI %d PLT %d conflict, ConflictArg: Term:%d, Index:%d", rf.me, rf.currentTerm, args.LeaderId, args.Term, args.PrevLogIndex, args.PrevLogTerm, reply.XTerm, reply.XIndex)
+		DebugLog(dLog2, "S%d T%d -> S%d T%d ,AppEnt PLI %d PLT %d conflict, ConflictArg: Term:%d, Index:%d, Len:%d", rf.me, rf.currentTerm, args.LeaderId, args.Term, args.PrevLogIndex, args.PrevLogTerm, reply.XTerm, reply.XIndex, reply.XLen)
 		return
 	}
 	//rule 3
@@ -608,7 +638,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArg, reply *AppendEntriesReply)
 	if len(args.Entries) == 0 {
 		DebugLog(dLog2, "S%d T%d Reply heartbeats True", rf.me, rf.currentTerm)
 	} else {
-		DebugLog(dLog2, "S%d T%d Reply AppEnt PLI %d PLT %d Success True", rf.me, rf.currentTerm, args.PrevLogIndex, args.PrevLogTerm)
+		DebugLog(dLog2, "S%d T%d Reply AppEnt PLI %d PLT %d LL %d Success True", rf.me, rf.currentTerm, args.PrevLogIndex, args.PrevLogTerm, len(args.Entries))
 	}
 	reply.Success = true
 
