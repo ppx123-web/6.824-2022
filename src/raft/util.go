@@ -74,3 +74,7 @@ func DebugLog(topic logTopic, format string, a ...interface{}) {
 		log.Printf(format, a...)
 	}
 }
+
+func Fatal(s string) {
+	log.Fatal(s)
+}

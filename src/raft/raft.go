@@ -22,7 +22,6 @@ import (
 
 	"bytes"
 	"math/rand"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -66,31 +65,32 @@ type ApplyMsg struct {
 type LogEntry struct {
 	Term     int
 	Commands interface{}
-	Index    int //start from 1
+	Index    int // log starting at some index
 }
 
 type Logs struct {
-	Log   []LogEntry
-	Start int //the first log's index
+	Log       []LogEntry
+	Start     int // the first log's index
+	StartTerm int
 }
 
 func (l *Logs) LastLogIndex() int {
 	if l.LogLength() == 0 {
-		return 0
+		return l.Start
 	}
 	return l.LastLog().Index
 }
 
 func (l *Logs) LastLogTerm() int {
 	if l.LogLength() == 0 {
-		return 0
+		return l.StartTerm
 	}
 	return l.LastLog().Term
 }
 
 func (l *Logs) LastLog() LogEntry {
 	if l.LogLength() == 0 {
-		os.Exit(1)
+		return LogEntry{Term: l.StartTerm, Index: l.Start}
 	}
 	return l.Log[len(l.Log)-1]
 }
@@ -100,27 +100,17 @@ func (l *Logs) LogLength() int {
 }
 
 func (l *Logs) LogIndexMap(index int) LogEntry {
-	if index == 0 {
-		return LogEntry{Term: 0, Commands: 0, Index: 0}
+	if index == l.Start {
+		return LogEntry{Term: l.StartTerm, Index: l.Start}
 	}
-	if l.LogLength() <= index-l.Start {
-		os.Exit(1)
-	}
-	return l.Log[index-l.Start]
-}
-
-func (l *Logs) LogPlace(index int) int {
-	if l.LogLength() <= index-l.Start {
-		os.Exit(1)
-	}
-	return index - l.Start
+	return l.Log[index-l.Start-1]
 }
 
 func (l *Logs) LogNextIndex() int {
 	if l.LogLength() == 0 {
-		return l.Start
+		return l.Start + 1
 	} else {
-		return l.LastLog().Index + 1
+		return l.LastLogIndex() + 1
 	}
 }
 
@@ -134,16 +124,16 @@ func (l *Logs) LogAllocate(term int, cmd interface{}) {
 
 func (l *Logs) LogCopy(src *Logs) {
 	l.Start = src.Start
-	l.Log = make([]LogEntry, len(src.Log))
+	l.Log = make([]LogEntry, src.LogLength())
 	copy(l.Log, src.Log)
 }
 
 func (l *Logs) LogToEnd(index int) []LogEntry {
-	return l.Log[index-l.Start:]
+	return l.Log[index-l.Start-1:]
 }
 
 func (l *Logs) LogStartTo(index int) []LogEntry {
-	return l.Log[0 : index-l.Start]
+	return l.Log[:index-l.Start-1]
 }
 
 func LogUpToDate(lastLogTerm1, lastLogIndex1, lastLogTerm2, lastLogIndex2 int) bool {
@@ -248,7 +238,7 @@ func (rf *Raft) persist() {
 	} else {
 		data := w.Bytes()
 		rf.persister.SaveRaftState(data)
-		DebugLog(dPersist, "S%d T%d persist success, Log %d", rf.me, rf.currentTerm, rf.log.LogLength())
+		DebugLog(dPersist, "S%d T%d persist success, Log Length %d, Start %d, End %d", rf.me, rf.currentTerm, rf.log.LogLength(), rf.log.Start, rf.log.LastLogIndex())
 	}
 
 }
@@ -323,6 +313,7 @@ func (rf *Raft) InstallSnapshot(args InstallSnapshotArg, reply InstallSnapshotRe
 // have more recent info since it communicate the snapshot on applyCh.
 func (rf *Raft) CondInstallSnapshot(lastIncludedTerm int, lastIncludedIndex int, snapshot []byte) bool {
 	// Your code here (2D).
+	// Previously, this lab recommended that you implement a function called CondInstallSnapshot to avoid the requirement that snapshots and log entries sent on applyCh are coordinated. This vestigal API interface remains, but you are discouraged from implementing it: instead, we suggest that you simply have it return true.
 	return true
 }
 
@@ -334,7 +325,13 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	// Your code here (2D).
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-
+	newStart := index
+	tmpLogs := Logs{
+		Log:   rf.log.LogToEnd(newStart),
+		Start: newStart,
+	}
+	rf.log.LogCopy(&tmpLogs)
+	DebugLog(dSnap, "S%d T%d Snapshot index %d, log start at %d", rf.me, rf.currentTerm, index, rf.log.Start)
 }
 
 // example RequestVote RPC arguments structure.
@@ -407,8 +404,8 @@ type AppendEntriesReply struct {
 func (rf *Raft) LeaderSendHeartbeats(server int) {
 	rf.mu.Lock()
 	nextIndex := rf.nextIndex[server]
-	if nextIndex == 0 {
-		nextIndex = 1
+	if nextIndex <= rf.log.Start {
+		nextIndex = rf.log.Start + 1
 	}
 	if rf.log.LastLogIndex()+1 < nextIndex {
 		nextIndex = rf.log.LastLogIndex() + 1
@@ -422,7 +419,9 @@ func (rf *Raft) LeaderSendHeartbeats(server int) {
 		Entries:      make([]LogEntry, rf.log.LastLogIndex()-nextIndex+1),
 		LeaderCommit: rf.commitIndex,
 	}
-	copy(args.Entries, rf.log.LogToEnd(nextIndex))
+	if rf.log.LastLogIndex() >= nextIndex {
+		copy(args.Entries, rf.log.LogToEnd(nextIndex))
+	}
 	if rf.state != Leader {
 		rf.mu.Unlock()
 		return
@@ -458,7 +457,7 @@ func (rf *Raft) LeaderSendEntries() {
 func (rf *Raft) LeaderSendOneEntry(server int, args *AppendEntriesArg) {
 	var reply AppendEntriesReply
 	rf.mu.Lock()
-	DebugLog(dLog, "S%d T%d -> S%d Sending Entries PLI: %d PLT %d LC: %d ", rf.me, rf.currentTerm, server, args.PrevLogIndex, args.PrevLogTerm, args.LeaderCommit)
+	DebugLog(dLog, "S%d T%d -> S%d Sending Entries PLI: %d PLT %d LC: %d, Entries Len %d", rf.me, rf.currentTerm, server, args.PrevLogIndex, args.PrevLogTerm, args.LeaderCommit, len(args.Entries))
 	rf.mu.Unlock()
 	ok := rf.sendAppendEntries(server, args, &reply)
 	if ok {
@@ -482,7 +481,7 @@ func (rf *Raft) LeaderSendOneEntry(server int, args *AppendEntriesArg) {
 				rf.nextIndex[server] = reply.XLen + 1
 			} else {
 				var newNextIndex = 0
-				for index := args.PrevLogIndex; index > 0; index-- {
+				for index := args.PrevLogIndex; index > rf.log.Start; index-- {
 					if rf.log.LogIndexMap(index).Term == reply.XTerm {
 						newNextIndex = index + 1
 						break
@@ -568,12 +567,12 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArg, reply *AppendEntriesReply)
 		reply.Success = false
 		reply.Conflict = true
 		if rf.log.LastLogIndex() < args.PrevLogIndex {
-			reply.XLen = rf.log.LogLength()
+			reply.XLen = rf.log.Start + rf.log.LogLength()
 			reply.XTerm = -1
 		} else {
 			reply.XTerm = rf.log.LogIndexMap(args.PrevLogIndex).Term
 			reply.XIndex = 1
-			for index := args.PrevLogIndex; index > 0; index-- {
+			for index := args.PrevLogIndex; index > rf.log.Start; index-- {
 				if rf.log.LogIndexMap(index).Term != reply.XTerm {
 					reply.XIndex = index + 1
 					break
@@ -588,7 +587,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArg, reply *AppendEntriesReply)
 	nextIndex := len(args.Entries)
 	for id, entry := range args.Entries {
 		curId := args.PrevLogIndex + 1 + id
-		if curId > rf.log.LastLogIndex() || (entry.Index == rf.log.LogIndexMap(curId).Index && entry.Term != rf.log.LogIndexMap(curId).Term) {
+		if curId > rf.log.LastLogIndex() || entry.Index == rf.log.LogIndexMap(curId).Index && entry.Term != rf.log.LogIndexMap(curId).Term {
 			rf.log.Log = rf.log.LogStartTo(curId)
 			nextIndex = id
 			break
@@ -609,7 +608,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArg, reply *AppendEntriesReply)
 	if len(args.Entries) == 0 {
 		DebugLog(dLog2, "S%d T%d Reply heartbeats True", rf.me, rf.currentTerm)
 	} else {
-		DebugLog(dLog2, "S%d T%d Reply AppEnt Success True", rf.me, rf.currentTerm)
+		DebugLog(dLog2, "S%d T%d Reply AppEnt PLI %d PLT %d Success True", rf.me, rf.currentTerm, args.PrevLogIndex, args.PrevLogTerm)
 	}
 	reply.Success = true
 
@@ -844,7 +843,8 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.state = Follower
 	rf.heartbeat = 100 * time.Millisecond //less than 10 heartbeats per second
 
-	rf.log.Start = 1
+	rf.log.Start = 0
+	rf.log.StartTerm = 0
 	rf.ResetElectionTime()
 
 	rf.commitIndex = 0
