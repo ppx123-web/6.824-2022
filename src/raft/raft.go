@@ -77,28 +77,28 @@ type LogEntry struct {
 }
 
 type Logs struct {
-	Log       []LogEntry
-	Start     int // the first log's index
-	StartTerm int
+	Log               []LogEntry
+	LastIncludedIndex int // the first log's index
+	LastIncludedTerm  int
 }
 
 func (l *Logs) LastLogIndex() int {
 	if l.LogLength() == 0 {
-		return l.Start
+		return l.LastIncludedIndex
 	}
 	return l.LastLog().Index
 }
 
 func (l *Logs) LastLogTerm() int {
 	if l.LogLength() == 0 {
-		return l.StartTerm
+		return l.LastIncludedTerm
 	}
 	return l.LastLog().Term
 }
 
 func (l *Logs) LastLog() LogEntry {
 	if l.LogLength() == 0 {
-		return LogEntry{Term: l.StartTerm, Index: l.Start}
+		return LogEntry{Term: l.LastIncludedTerm, Index: l.LastIncludedIndex}
 	}
 	return l.Log[len(l.Log)-1]
 }
@@ -108,18 +108,18 @@ func (l *Logs) LogLength() int {
 }
 
 func (l *Logs) LogIndexMap(index int) LogEntry {
-	if index == l.Start {
-		return LogEntry{Term: l.StartTerm, Index: l.Start}
+	if index == l.LastIncludedIndex {
+		return LogEntry{Term: l.LastIncludedTerm, Index: l.LastIncludedIndex}
 	}
-	if index-l.Start-1 < 0 {
-		DebugLog(dError, "Wrong Log Start %d, Index %d", l.Start, index)
+	if index-l.LastIncludedIndex-1 < 0 {
+		DebugLog(dError, "Wrong Log Start %d, Index %d", l.LastIncludedIndex, index)
 	}
-	return l.Log[index-l.Start-1]
+	return l.Log[index-l.LastIncludedIndex-1]
 }
 
 func (l *Logs) LogNextIndex() int {
 	if l.LogLength() == 0 {
-		return l.Start + 1
+		return l.LastIncludedIndex + 1
 	} else {
 		return l.LastLogIndex() + 1
 	}
@@ -134,18 +134,18 @@ func (l *Logs) LogAllocate(term int, cmd interface{}) {
 }
 
 func (l *Logs) LogCopy(src *Logs) {
-	l.Start = src.Start
-	l.StartTerm = src.StartTerm
+	l.LastIncludedIndex = src.LastIncludedIndex
+	l.LastIncludedTerm = src.LastIncludedTerm
 	l.Log = make([]LogEntry, src.LogLength())
 	copy(l.Log, src.Log)
 }
 
 func (l *Logs) LogToEnd(index int) []LogEntry {
-	return l.Log[index-l.Start-1:]
+	return l.Log[index-l.LastIncludedIndex-1:]
 }
 
 func (l *Logs) LogStartTo(index int) []LogEntry {
-	return l.Log[:index-l.Start-1]
+	return l.Log[:index-l.LastIncludedIndex-1]
 }
 
 func LogUpToDate(lastLogTerm1, lastLogIndex1, lastLogTerm2, lastLogIndex2 int) bool {
@@ -180,11 +180,9 @@ type Raft struct {
 	electionTime time.Time
 
 	//Persistent state on all servers
-	currentTerm       int
-	votedFor          int
-	log               Logs
-	lastIncludedTerm  int
-	lastIncludedIndex int
+	currentTerm int
+	votedFor    int
+	log         Logs
 
 	// Volatile state on all servers
 	commitIndex int //index of highest log entry known to be committed (initialized to 0, increases monotonically)
@@ -245,7 +243,7 @@ func (rf *Raft) persist() {
 	} else {
 		data := w.Bytes()
 		rf.persister.SaveRaftState(data)
-		DebugLog(dPersist, "S%d T%d persist success, Log Length %d, Start %d, End %d", rf.me, rf.currentTerm, rf.log.LogLength(), rf.log.Start, rf.log.LastLogIndex())
+		DebugLog(dPersist, "S%d T%d persist success, Log Length %d, Start %d, End %d", rf.me, rf.currentTerm, rf.log.LogLength(), rf.log.LastIncludedIndex, rf.log.LastLogIndex())
 	}
 
 }
@@ -274,7 +272,15 @@ func (rf *Raft) readPersist(data []byte) {
 		// rf.lastApplied = rf.log.Start
 		DebugLog(dPersist, "S%d T%d Read persistant Success, log length %d", rf.me, rf.currentTerm, rf.log.LogLength())
 	}
+}
 
+func (rf *Raft) getPersistData() []byte {
+	w := new(bytes.Buffer)
+	e := labgob.NewEncoder(w)
+	e.Encode(rf.currentTerm)
+	e.Encode(rf.votedFor)
+	e.Encode(rf.log)
+	return w.Bytes()
 }
 
 type InstallSnapshotArg struct {
@@ -332,27 +338,35 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	// Your code here (2D).
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	if index > rf.log.Start {
-		newStart := index
-		tmpLogs := Logs{
-			Log:       rf.log.LogToEnd(newStart + 1),
-			Start:     newStart,
-			StartTerm: rf.log.LogIndexMap(newStart).Term,
-		}
-		rf.log.LogCopy(&tmpLogs)
-		DebugLog(dSnap, "S%d T%d Snapshot index %d, log start at %d", rf.me, rf.currentTerm, index, rf.log.Start)
-
-		// w := new(bytes.Buffer)
-		// e := labgob.NewEncoder(w)
-		// e1 := e.Encode(snapshot)
-		// e2 := e.Encode(index)
-		// if e1 == nil && e2 == nil {
-
-		// } else {
-		// 	DebugLog(dError, "S%d T%d Encode Snapshot Error", rf.me, rf.currentTerm)
-		// }
-
+	if rf.log.LastIncludedIndex >= index || index > rf.lastApplied {
+		return
 	}
+	for i := range rf.peers {
+		if i != rf.me && rf.leader == rf.me {
+			if index > rf.nextIndex[i] {
+				return
+			}
+		}
+	}
+	newStart := index
+	tmpLogs := Logs{
+		Log:               rf.log.LogToEnd(newStart + 1),
+		LastIncludedIndex: newStart,
+		LastIncludedTerm:  rf.log.LogIndexMap(newStart).Term,
+	}
+	rf.log.LogCopy(&tmpLogs)
+	DebugLog(dSnap, "S%d T%d Snapshot index %d, log start at %d", rf.me, rf.currentTerm, index, rf.log.LastIncludedIndex)
+
+	rf.persister.SaveStateAndSnapshot(rf.getPersistData(), snapshot)
+	// w := new(bytes.Buffer)
+	// e := labgob.NewEncoder(w)
+	// e1 := e.Encode(snapshot)
+	// e2 := e.Encode(index)
+	// if e1 == nil && e2 == nil {
+
+	// } else {
+	// 	DebugLog(dError, "S%d T%d Encode Snapshot Error", rf.me, rf.currentTerm)
+	// }
 
 }
 
@@ -426,8 +440,8 @@ type AppendEntriesReply struct {
 func (rf *Raft) LeaderSendHeartbeats(server int) {
 	rf.mu.Lock()
 	nextIndex := rf.nextIndex[server]
-	if nextIndex <= rf.log.Start {
-		nextIndex = rf.log.Start + 1
+	if nextIndex <= rf.log.LastIncludedIndex {
+		nextIndex = rf.log.LastIncludedIndex + 1
 	}
 	if rf.log.LastLogIndex()+1 < nextIndex {
 		nextIndex = rf.log.LastLogIndex() + 1
@@ -504,7 +518,7 @@ func (rf *Raft) LeaderSendOneEntry(server int, args *AppendEntriesArg) {
 				rf.nextIndex[server] = reply.XLen + 1
 			} else {
 				var newNextIndex = 0
-				for index := args.PrevLogIndex; index > rf.log.Start; index-- {
+				for index := args.PrevLogIndex; index > rf.log.LastIncludedIndex; index-- {
 					if rf.log.LogIndexMap(index).Term == reply.XTerm {
 						newNextIndex = index + 1
 						break
@@ -585,7 +599,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArg, reply *AppendEntriesReply)
 	}
 	rf.ResetElectionTime()
 
-	if args.PrevLogIndex < rf.log.Start {
+	if args.PrevLogIndex < rf.log.LastIncludedIndex {
 		reply.Success = false
 		reply.Conflict = false
 		return
@@ -597,12 +611,12 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArg, reply *AppendEntriesReply)
 		reply.Success = false
 		reply.Conflict = true
 		if rf.log.LastLogIndex() < args.PrevLogIndex {
-			reply.XLen = rf.log.Start + rf.log.LogLength()
+			reply.XLen = rf.log.LastIncludedIndex + rf.log.LogLength()
 			reply.XTerm = -1
 		} else {
 			reply.XTerm = rf.log.LogIndexMap(args.PrevLogIndex).Term
 			reply.XIndex = 1
-			for index := args.PrevLogIndex; index > rf.log.Start; index-- {
+			for index := args.PrevLogIndex; index > rf.log.LastIncludedIndex; index-- {
 				if rf.log.LogIndexMap(index).Term != reply.XTerm {
 					reply.XIndex = index + 1
 					break
@@ -873,8 +887,8 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.state = Follower
 	rf.heartbeat = 100 * time.Millisecond //less than 10 heartbeats per second
 
-	rf.log.Start = 0
-	rf.log.StartTerm = 0
+	rf.log.LastIncludedIndex = 0
+	rf.log.LastIncludedTerm = 0
 	rf.ResetElectionTime()
 
 	rf.commitIndex = 0
