@@ -7,7 +7,7 @@ threads=0
 if [ $1 -lt $3 ]; then
     threads=$1
 else
-    threads=20
+    threads=$3
 fi
 echo Test $2 $1 trials with $threads threads
 ./dtest -o ./tmp -n $1 $2 -p $3
