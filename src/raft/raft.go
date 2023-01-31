@@ -458,33 +458,35 @@ type AppendEntriesReply struct {
 	XLen     int
 }
 
-func (rf *Raft) LeaderSendHeartbeats(server int) {
-	rf.mu.Lock()
-	nextIndex := rf.nextIndex[server]
-	if nextIndex <= rf.log.LastIncludedIndex {
-		nextIndex = rf.log.LastIncludedIndex + 1
+func (rf *Raft) LeaderSendHeartbeats() {
+	for server := range rf.peers {
+		if server == rf.me {
+			continue
+		}
+		nextIndex := rf.nextIndex[server]
+		if nextIndex <= rf.log.LastIncludedIndex {
+			nextIndex = rf.log.LastIncludedIndex + 1
+		}
+		if rf.log.LastLogIndex()+1 < nextIndex {
+			nextIndex = rf.log.LastLogIndex() + 1
+		}
+		prevLog := rf.log.LogIndexMap(nextIndex - 1)
+		var args = AppendEntriesArg{
+			Term:         rf.currentTerm,
+			LeaderId:     rf.me,
+			PrevLogIndex: nextIndex - 1,
+			PrevLogTerm:  prevLog.Term,
+			Entries:      make([]LogEntry, rf.log.LastLogIndex()-nextIndex+1),
+			LeaderCommit: rf.commitIndex,
+		}
+		if rf.log.LastLogIndex() >= nextIndex {
+			copy(args.Entries, rf.log.LogToEnd(nextIndex))
+		}
+		if rf.state != Leader {
+			return
+		}
+		go rf.LeaderSendOneEntry(server, &args)
 	}
-	if rf.log.LastLogIndex()+1 < nextIndex {
-		nextIndex = rf.log.LastLogIndex() + 1
-	}
-	prevLog := rf.log.LogIndexMap(nextIndex - 1)
-	var args = AppendEntriesArg{
-		Term:         rf.currentTerm,
-		LeaderId:     rf.me,
-		PrevLogIndex: nextIndex - 1,
-		PrevLogTerm:  prevLog.Term,
-		Entries:      make([]LogEntry, rf.log.LastLogIndex()-nextIndex+1),
-		LeaderCommit: rf.commitIndex,
-	}
-	if rf.log.LastLogIndex() >= nextIndex {
-		copy(args.Entries, rf.log.LogToEnd(nextIndex))
-	}
-	if rf.state != Leader {
-		rf.mu.Unlock()
-		return
-	}
-	rf.mu.Unlock()
-	rf.LeaderSendOneEntry(server, &args)
 }
 
 func (rf *Raft) LeaderSendEntries() {
@@ -844,11 +846,7 @@ func (rf *Raft) doCandidate() {
 
 func (rf *Raft) doLeader() {
 	rf.ResetElectionTime()
-	for index := range rf.peers {
-		if index != rf.me {
-			go rf.LeaderSendHeartbeats(index)
-		}
-	}
+	rf.LeaderSendHeartbeats()
 }
 
 func (rf *Raft) CandidateRequestVotes(index int, votes *int, args *RequestVoteArgs, isleader *bool) {
