@@ -309,16 +309,28 @@ func (rf *Raft) InstallSnapshot(args InstallSnapshotArg, reply InstallSnapshotRe
 	if rf.UpdateTerm(args.Term) {
 		return
 	}
-	// var log Logs
-	// r := bytes.NewBuffer(rf.persister.ReadSnapshot())
-	// d := labgob.NewDecoder(r)
-	// d.Decode(&log)
-	// prevLastIncludeIndex := log.Start
-	// if args.LastIncludedIndex < prevLastIncludeIndex {
-	// 	w := new(bytes.Buffer)
-	// 	e := labgob.NewEncoder(w)
-	// 	e1 := e.Encode(args.LastIncludedIndex)
-	// }
+	var log Logs
+	r := bytes.NewBuffer(rf.persister.ReadSnapshot())
+	d := labgob.NewDecoder(r)
+	d.Decode(&log)
+	prevLastIncludeIndex := log.LastIncludedIndex
+	if args.LastIncludedIndex > rf.commitIndex && args.LastIncludedIndex >= prevLastIncludeIndex {
+		w := new(bytes.Buffer)
+		e := labgob.NewEncoder(w)
+		e.Encode(args.Data)
+		rf.persister.SaveStateAndSnapshot(rf.getPersistData(), w.Bytes())
+
+		msg := ApplyMsg{
+			SnapshotValid: true,
+			Snapshot:      args.Data,
+			SnapshotIndex: args.LastIncludedIndex,
+			SnapshotTerm:  args.LastIncludedTerm,
+		}
+
+		go func() {
+			rf.applyCh <- msg
+		}()
+	}
 
 }
 
@@ -338,16 +350,10 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	// Your code here (2D).
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	if rf.log.LastIncludedIndex >= index || index > rf.lastApplied {
+	if rf.log.LastIncludedIndex >= index || index > rf.lastApplied || index > rf.log.LastLogIndex() {
 		return
 	}
-	for i := range rf.peers {
-		if i != rf.me && rf.leader == rf.me {
-			if index > rf.nextIndex[i] {
-				return
-			}
-		}
-	}
+
 	newStart := index
 	tmpLogs := Logs{
 		Log:               rf.log.LogToEnd(newStart + 1),
@@ -358,15 +364,6 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	DebugLog(dSnap, "S%d T%d Snapshot index %d, log start at %d", rf.me, rf.currentTerm, index, rf.log.LastIncludedIndex)
 
 	rf.persister.SaveStateAndSnapshot(rf.getPersistData(), snapshot)
-	// w := new(bytes.Buffer)
-	// e := labgob.NewEncoder(w)
-	// e1 := e.Encode(snapshot)
-	// e2 := e.Encode(index)
-	// if e1 == nil && e2 == nil {
-
-	// } else {
-	// 	DebugLog(dError, "S%d T%d Encode Snapshot Error", rf.me, rf.currentTerm)
-	// }
 
 }
 
@@ -598,12 +595,6 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArg, reply *AppendEntriesReply)
 		rf.state = Follower
 	}
 	rf.ResetElectionTime()
-
-	if args.PrevLogIndex < rf.log.LastIncludedIndex {
-		reply.Success = false
-		reply.Conflict = false
-		return
-	}
 
 	//append entries
 	//rule 2: Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm
