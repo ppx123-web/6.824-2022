@@ -21,6 +21,7 @@ import (
 	//	"bytes"
 
 	"bytes"
+	"log"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -300,16 +301,21 @@ type InstallSnapshotReply struct {
 }
 
 func (rf *Raft) SendInstallSnapshot(server int) {
+	rf.mu.Lock()
 	args := InstallSnapshotArg{
 		Term:              rf.currentTerm,
-		LeaderId:          rf.leader,
+		LeaderId:          rf.me,
 		LastIncludedIndex: rf.log.LastIncludedIndex,
 		LastIncludedTerm:  rf.log.LastIncludedTerm,
 		Data:              rf.persister.ReadSnapshot(),
 	}
+	DebugLog(dSnap, "S%d T%d Send snapshot to S%d, LII %d, LIT %d", rf.me, rf.currentTerm, server, args.LastIncludedIndex, args.LastIncludedTerm)
+	rf.mu.Unlock()
 	var reply InstallSnapshotReply
-	rf.SendInstallSnapshotRPC(server, &args, &reply)
-	if rf.UpdateTerm(reply.Term) {
+	ok := rf.SendInstallSnapshotRPC(server, &args, &reply)
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	if ok && rf.UpdateTerm(reply.Term) {
 		return
 	}
 }
@@ -319,26 +325,24 @@ func (rf *Raft) SendInstallSnapshotRPC(server int, args *InstallSnapshotArg, rep
 	return ok
 }
 
-func (rf *Raft) InstallSnapshot(args InstallSnapshotArg, reply InstallSnapshotReply) {
+func (rf *Raft) InstallSnapshot(args *InstallSnapshotArg, reply *InstallSnapshotReply) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 	reply.Term = rf.currentTerm
 	if rf.UpdateTerm(args.Term) {
 		return
 	}
-	var log Logs
-	r := bytes.NewBuffer(rf.persister.ReadSnapshot())
-	d := labgob.NewDecoder(r)
-	d.Decode(&log)
-	prevLastIncludeIndex := log.LastIncludedIndex
+	prevLastIncludeIndex := rf.log.LastIncludedIndex
+	DebugLog(dSnap, "S%d T%d Get snapshot from S%d T%d, LII %d, LIT %d", rf.me, rf.currentTerm, args.LeaderId, args.Term, args.LastIncludedIndex, args.LastIncludedTerm)
 	if args.LastIncludedIndex > rf.commitIndex && args.LastIncludedIndex >= prevLastIncludeIndex {
 		w := new(bytes.Buffer)
 		e := labgob.NewEncoder(w)
 		e.Encode(args.Data)
 		rf.persister.SaveStateAndSnapshot(rf.getPersistData(), w.Bytes())
-
-		if args.LastIncludedTerm == rf.log.LogIndexMap(args.LastIncludedIndex).Term {
+		DebugLog(dSnap, "S%d T%d update snapshot file, LII %d, LIT %d", rf.me, rf.currentTerm, args.LastIncludedIndex, args.LastIncludedTerm)
+		if args.LastIncludedIndex <= rf.log.LastIncludedIndex && args.LastIncludedTerm == rf.log.LogIndexMap(args.LastIncludedIndex).Term {
 			// If existing log entry has same index and term as snapshot’s last included entry, retain log entries following it and reply
+			DebugLog(dSnap, "S%d T%d snapshot retain log", rf.me, rf.currentTerm)
 			return
 		}
 
@@ -374,7 +378,8 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	// Your code here (2D).
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	if rf.log.LastIncludedIndex >= index || index != rf.lastApplied || index > rf.log.LastLogIndex() {
+	if rf.log.LastIncludedIndex >= index || index > rf.lastApplied || index > rf.log.LastLogIndex() {
+		DebugLog(dSnap, "S%d T%d Snapshot abort, index %d, applied %d", rf.me, rf.currentTerm, index, rf.lastApplied)
 		return
 	}
 
@@ -385,7 +390,7 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 		LastIncludedTerm:  rf.log.LogIndexMap(newStart).Term,
 	}
 	rf.log.LogCopy(&tmpLogs)
-	DebugLog(dSnap, "S%d T%d Snapshot index %d, log start at %d", rf.me, rf.currentTerm, index, rf.log.LastIncludedIndex)
+	DebugLog(dSnap, "S%d T%d Snapshot index %d, log start at %d, log length %d", rf.me, rf.currentTerm, index, rf.log.LastIncludedIndex, rf.log.LogLength())
 
 	rf.persister.SaveStateAndSnapshot(rf.getPersistData(), snapshot)
 
@@ -465,10 +470,10 @@ func (rf *Raft) LeaderSendHeartbeats() {
 		}
 		nextIndex := rf.nextIndex[server]
 		if nextIndex <= rf.log.LastIncludedIndex {
+			// go rf.SendInstallSnapshot(server)
+			// return
+			log.Fatal("nextIndex Error")
 			nextIndex = rf.log.LastIncludedIndex + 1
-		}
-		if rf.log.LastLogIndex()+1 < nextIndex {
-			nextIndex = rf.log.LastLogIndex() + 1
 		}
 		prevLog := rf.log.LogIndexMap(nextIndex - 1)
 		var args = AppendEntriesArg{
@@ -479,9 +484,8 @@ func (rf *Raft) LeaderSendHeartbeats() {
 			Entries:      make([]LogEntry, rf.log.LastLogIndex()-nextIndex+1),
 			LeaderCommit: rf.commitIndex,
 		}
-		if rf.log.LastLogIndex() >= nextIndex {
-			copy(args.Entries, rf.log.LogToEnd(nextIndex))
-		}
+		copy(args.Entries, rf.log.LogToEnd(nextIndex))
+
 		if rf.state != Leader {
 			return
 		}
@@ -497,6 +501,12 @@ func (rf *Raft) LeaderSendEntries() {
 		}
 		nextIndex := rf.nextIndex[server]
 		if rf.log.LastLogIndex() >= nextIndex {
+			if nextIndex <= rf.log.LastIncludedIndex {
+				// go rf.SendInstallSnapshot(server)
+				// return
+				log.Fatal("nextIndex Error")
+				nextIndex = rf.log.LastIncludedIndex + 1
+			}
 			prevLog := rf.log.LogIndexMap(nextIndex - 1)
 			var args = AppendEntriesArg{
 				Term:         rf.currentTerm,
@@ -560,6 +570,12 @@ func (rf *Raft) LeaderSendOneEntry(server int, args *AppendEntriesArg) {
 			// rf.nextIndex[server] -= 1
 			//retry
 			nextIndex := rf.nextIndex[server]
+			if nextIndex <= rf.log.LastIncludedIndex {
+				// go rf.SendInstallSnapshot(server)
+				// return
+				log.Fatal("nextIndex Error")
+				nextIndex = rf.log.LastIncludedIndex + 1
+			}
 			prevLog := rf.log.LogIndexMap(nextIndex - 1)
 			var newargs = AppendEntriesArg{
 				Term:         rf.currentTerm,
@@ -763,25 +779,26 @@ func (rf *Raft) applier() {
 	for !rf.killed() {
 		time.Sleep(10 * time.Millisecond)
 		rf.mu.Lock()
+		var tmpLog Logs
+		tmpCommitIndex := rf.commitIndex
+		tmpLog.LogCopy(&rf.log)
+		DebugLog(dTimer, "S%d T%d copy temp log, start %d, len %d", rf.me, rf.currentTerm, rf.log.LastIncludedIndex, rf.log.LogLength())
 		for {
-			if rf.commitIndex > rf.lastApplied {
+			if tmpCommitIndex > rf.lastApplied {
 				rf.lastApplied += 1
 				var msg = ApplyMsg{
 					CommandValid: true,
-					Command:      rf.log.LogIndexMap(rf.lastApplied).Commands,
-					CommandIndex: rf.log.LogIndexMap(rf.lastApplied).Index,
+					Command:      tmpLog.LogIndexMap(rf.lastApplied).Commands,
+					CommandIndex: tmpLog.LogIndexMap(rf.lastApplied).Index,
 				}
 				rf.mu.Unlock()
 				rf.applyCh <- msg
 				rf.mu.Lock()
 				if rf.state == Leader {
-					DebugLog(dTimer, "S%d T%d (Leader) apply index %d, cmd %v, index %d", rf.me, rf.currentTerm, rf.lastApplied, msg.Command, msg.CommandIndex)
+					DebugLog(dTimer, "S%d T%d (Leader) apply, cmd %v, index %d", rf.me, rf.currentTerm, msg.Command, msg.CommandIndex)
 				} else {
-					DebugLog(dTimer, "S%d T%d (Follower) apply index %d, cmd %v, index %d", rf.me, rf.currentTerm, rf.lastApplied, msg.Command, msg.CommandIndex)
+					DebugLog(dTimer, "S%d T%d (Follower) apply, cmd %v, index %d", rf.me, rf.currentTerm, msg.Command, msg.CommandIndex)
 				}
-				// if rf.log[rf.lastApplied].Term != rf.currentTerm {
-				// 	continue
-				// }
 			} else {
 				break
 			}
