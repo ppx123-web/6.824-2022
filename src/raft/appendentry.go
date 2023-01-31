@@ -33,49 +33,14 @@ func (rf *Raft) UpdateTerm(term int) bool {
 	return false
 }
 
-func (rf *Raft) LeaderSendHeartbeats() {
-	for server := range rf.peers {
-		if server == rf.me {
-			continue
-		}
-		nextIndex := rf.nextIndex[server]
-		if nextIndex <= rf.log.LastIncludedIndex {
-			// go rf.SendInstallSnapshot(server, &InstallSnapshotArg{
-			// 	Term:              rf.currentTerm,
-			// 	LeaderId:          rf.me,
-			// 	LastIncludedIndex: rf.log.LastIncludedIndex,
-			// 	LastIncludedTerm:  rf.log.LastIncludedTerm,
-			// 	Data:              rf.persister.ReadSnapshot(),
-			// })
-			// return
-			nextIndex = rf.log.LastIncludedIndex + 1
-		}
-		prevLog := rf.log.get(nextIndex - 1)
-		var args = AppendEntriesArg{
-			Term:         rf.currentTerm,
-			LeaderId:     rf.me,
-			PrevLogIndex: nextIndex - 1,
-			PrevLogTerm:  prevLog.Term,
-			Entries:      make([]LogEntry, rf.log.LastLogIndex()-nextIndex+1),
-			LeaderCommit: rf.commitIndex,
-		}
-		copy(args.Entries, rf.log.LogToEnd(nextIndex))
-
-		if rf.state != Leader {
-			return
-		}
-		go rf.LeaderSendOneEntry(server, &args)
-	}
-}
-
-func (rf *Raft) LeaderSendEntries() {
+func (rf *Raft) LeaderSendEntries(heartbeat bool) {
 	for server := range rf.peers {
 		if server == rf.me {
 			rf.ResetElectionTime()
 			continue
 		}
 		nextIndex := rf.nextIndex[server]
-		if rf.log.LastLogIndex() >= nextIndex {
+		if rf.log.LastLogIndex() >= nextIndex || heartbeat {
 			if nextIndex <= rf.log.LastIncludedIndex {
 				// go rf.SendInstallSnapshot(server, &InstallSnapshotArg{
 				// 	Term:              rf.currentTerm,
@@ -123,7 +88,6 @@ func (rf *Raft) LeaderSendOneEntry(server int, args *AppendEntriesArg) {
 			rf.nextIndex[server] = args.PrevLogIndex + len(args.Entries) + 1
 			rf.matchIndex[server] = args.PrevLogIndex + len(args.Entries)
 			DebugLog(dLog2, "S%d T%d Set S%d nextIndex to %d", rf.me, rf.currentTerm, server, rf.nextIndex[server])
-			rf.LeaderCommit()
 		} else if reply.Conflict {
 			//Conflict
 			if reply.XTerm == -1 {
@@ -164,21 +128,26 @@ func (rf *Raft) LeaderSendOneEntry(server int, args *AppendEntriesArg) {
 
 }
 
-func (rf *Raft) LeaderCommit() {
-	if rf.state == Leader {
-		commit := rf.commitIndex
-		for n := commit + 1; n <= rf.log.LastLogIndex(); n++ {
-			sum := 1
-			for id := range rf.peers {
-				if id != rf.me && rf.matchIndex[id] >= n && rf.log.get(n).Term == rf.currentTerm {
-					sum += 1
+func (rf *Raft) Committer() {
+	for !rf.killed() {
+		time.Sleep(20 * time.Millisecond)
+		rf.mu.Lock()
+		if rf.state == Leader {
+			commit := rf.commitIndex
+			for n := commit + 1; n <= rf.log.LastLogIndex(); n++ {
+				sum := 1
+				for id := range rf.peers {
+					if id != rf.me && rf.matchIndex[id] >= n && rf.log.get(n).Term == rf.currentTerm {
+						sum += 1
+					}
+				}
+				if sum > len(rf.peers)/2 {
+					DebugLog(dCommit, "S%d T%d commit to index %d", rf.me, rf.currentTerm, n)
+					rf.commitIndex = n
 				}
 			}
-			if sum > len(rf.peers)/2 {
-				DebugLog(dCommit, "S%d T%d commit to index %d", rf.me, rf.currentTerm, n)
-				rf.commitIndex = n
-			}
 		}
+		rf.mu.Unlock()
 	}
 }
 

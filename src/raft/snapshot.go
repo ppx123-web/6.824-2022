@@ -42,6 +42,18 @@ type InstallSnapshotReply struct {
 	Term int
 }
 
+func (rf *Raft) newInstallSnapshotArgs() (args *InstallSnapshotArg) {
+	snapshot := rf.persister.ReadSnapshot()
+	args = &InstallSnapshotArg{
+		Term:              rf.currentTerm,
+		LeaderId:          rf.me,
+		LastIncludedIndex: rf.log.LastIncludedIndex,
+		LastIncludedTerm:  rf.log.LastIncludedTerm,
+		Data:              snapshot,
+	}
+	return args
+}
+
 func (rf *Raft) SendInstallSnapshot(server int, args *InstallSnapshotArg) (bool, *InstallSnapshotReply) {
 	rf.mu.Lock()
 	DebugLog(dSnap, "S%d T%d Send snapshot to S%d, LII %d, LIT %d", rf.me, rf.currentTerm, server, args.LastIncludedIndex, args.LastIncludedTerm)
@@ -50,14 +62,17 @@ func (rf *Raft) SendInstallSnapshot(server int, args *InstallSnapshotArg) (bool,
 	ok := rf.SendInstallSnapshotRPC(server, args, &reply)
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	if ok && rf.UpdateTerm(reply.Term) {
-		return ok, &reply
+	if ok {
+		if rf.UpdateTerm(reply.Term) {
+			return ok, &reply
+		}
+		if rf.currentTerm != args.Term || rf.state != Leader {
+			return ok, &reply
+		}
+		rf.nextIndex[server] = args.LastIncludedIndex + 1
+		rf.matchIndex[server] = args.LastIncludedIndex
 	}
-	if rf.currentTerm != args.Term || rf.state != Leader {
-		return ok, &reply
-	}
-	rf.nextIndex[server] = args.LastIncludedIndex + 1
-	rf.matchIndex[server] = args.LastIncludedIndex
+
 	return ok, &reply
 }
 
@@ -115,7 +130,7 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArg, reply *InstallSnapshot
 func (rf *Raft) CondInstallSnapshot(lastIncludedTerm int, lastIncludedIndex int, snapshot []byte) bool {
 	// Your code here (2D).
 	// Previously, this lab recommended that you implement a function called CondInstallSnapshot to avoid the requirement that snapshots and log entries sent on applyCh are coordinated. This vestigal API interface remains, but you are discouraged from implementing it: instead, we suggest that you simply have it return true.
-	DebugLog(dSnap, "S%d T%d apply snapshot", rf.me, rf.currentTerm)
+	DebugLog(dSnap, "S%d T%d apply snapshot, LII %d, LIT %d", rf.me, rf.currentTerm, lastIncludedIndex, lastIncludedTerm)
 	return true
 }
 
@@ -128,15 +143,14 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 	if rf.log.LastIncludedIndex >= index || index > rf.lastApplied || index > rf.log.LastLogIndex() {
-		DebugLog(dSnap, "S%d T%d Snapshot abort, index %d, applied %d", rf.me, rf.currentTerm, index, rf.lastApplied)
+		DebugLog(dSnap, "S%d T%d Snapshot abort, lastIncludedIndex %d, index %d, applied %d", rf.me, rf.currentTerm, rf.log.LastIncludedIndex, index, rf.lastApplied)
 		return
 	}
 
-	newStart := index
 	tmpLogs := Logs{
-		Log:               rf.log.LogToEnd(newStart + 1),
-		LastIncludedIndex: newStart,
-		LastIncludedTerm:  rf.log.get(newStart).Term,
+		Log:               rf.log.LogToEnd(index + 1),
+		LastIncludedIndex: index,
+		LastIncludedTerm:  rf.log.get(index).Term,
 	}
 	rf.log.LogCopy(&tmpLogs)
 	DebugLog(dSnap, "S%d T%d Snapshot index %d, log start at %d, log length %d", rf.me, rf.currentTerm, index, rf.log.LastIncludedIndex, rf.log.LogLength())

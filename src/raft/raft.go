@@ -142,7 +142,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	index = rf.log.LastLogIndex()
 	DebugLog(dLeader, "S%d T%d Get command %v, index %d", rf.me, rf.currentTerm, command, index)
 	rf.persist()
-	rf.LeaderSendEntries()
+	rf.LeaderSendEntries(false)
 	return index, term, isLeader
 }
 
@@ -206,6 +206,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	// start ticker goroutine to start elections
 	go rf.ticker()
 	go rf.applier()
+	go rf.Committer()
 	DebugLog(dInfo, "S%d init finish", rf.me)
 
 	return rf

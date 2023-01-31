@@ -11,19 +11,9 @@ import (
 // see paper's Figure 2 for a description of what should be persistent.
 func (rf *Raft) persist() {
 	// Your code here (2C).
-	w := new(bytes.Buffer)
-	e := labgob.NewEncoder(w)
-	e1 := e.Encode(rf.currentTerm)
-	e2 := e.Encode(rf.votedFor)
-	e3 := e.Encode(rf.log)
-	if e1 != nil || e2 != nil || e3 != nil {
-		DebugLog(dPersist, "S%d T%d persist fail, %v %v %v", rf.me, rf.currentTerm, e1, e2, e3)
-	} else {
-		data := w.Bytes()
-		rf.persister.SaveRaftState(data)
-		DebugLog(dPersist, "S%d T%d persist success, Log Length %d, Start %d, End %d", rf.me, rf.currentTerm, rf.log.LogLength(), rf.log.LastIncludedIndex, rf.log.LastLogIndex())
-	}
-
+	data := rf.getPersistData()
+	rf.persister.SaveRaftState(data)
+	DebugLog(dPersist, "S%d T%d persist success, Log Length %d, Start %d, End %d", rf.me, rf.currentTerm, rf.log.LogLength(), rf.log.LastIncludedIndex, rf.log.LastLogIndex())
 }
 
 // restore previously persisted state.
@@ -46,8 +36,8 @@ func (rf *Raft) readPersist(data []byte) {
 		rf.currentTerm = currentTerm
 		rf.votedFor = votedFor
 		rf.log.LogCopy(&log)
-		// rf.commitIndex = rf.log.Start
-		// rf.lastApplied = rf.log.Start
+		rf.commitIndex = rf.log.LastIncludedIndex
+		rf.lastApplied = rf.log.LastIncludedIndex
 		DebugLog(dPersist, "S%d T%d Read persistant Success, log length %d", rf.me, rf.currentTerm, rf.log.LogLength())
 	}
 }
@@ -55,8 +45,11 @@ func (rf *Raft) readPersist(data []byte) {
 func (rf *Raft) getPersistData() []byte {
 	w := new(bytes.Buffer)
 	e := labgob.NewEncoder(w)
-	e.Encode(rf.currentTerm)
-	e.Encode(rf.votedFor)
-	e.Encode(rf.log)
+	e1 := e.Encode(rf.currentTerm)
+	e2 := e.Encode(rf.votedFor)
+	e3 := e.Encode(rf.log)
+	if e1 != nil || e2 != nil || e3 != nil {
+		DebugLog(dPersist, "S%d T%d get persist data fail, %v %v %v", rf.me, rf.currentTerm, e1, e2, e3)
+	}
 	return w.Bytes()
 }

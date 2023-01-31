@@ -112,8 +112,7 @@ func (rf *Raft) doCandidate() {
 }
 
 func (rf *Raft) doLeader() {
-	rf.ResetElectionTime()
-	rf.LeaderSendHeartbeats()
+	rf.LeaderSendEntries(true)
 }
 
 func (rf *Raft) CandidateRequestVotes(index int, votes *int, args *RequestVoteArgs, isleader *bool) {
