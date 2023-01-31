@@ -21,7 +21,6 @@ import (
 	//	"bytes"
 
 	"bytes"
-	"log"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -470,10 +469,8 @@ func (rf *Raft) LeaderSendHeartbeats() {
 		}
 		nextIndex := rf.nextIndex[server]
 		if nextIndex <= rf.log.LastIncludedIndex {
-			// go rf.SendInstallSnapshot(server)
-			// return
-			log.Fatal("nextIndex Error")
-			nextIndex = rf.log.LastIncludedIndex + 1
+			go rf.SendInstallSnapshot(server)
+			return
 		}
 		prevLog := rf.log.LogIndexMap(nextIndex - 1)
 		var args = AppendEntriesArg{
@@ -502,10 +499,8 @@ func (rf *Raft) LeaderSendEntries() {
 		nextIndex := rf.nextIndex[server]
 		if rf.log.LastLogIndex() >= nextIndex {
 			if nextIndex <= rf.log.LastIncludedIndex {
-				// go rf.SendInstallSnapshot(server)
-				// return
-				log.Fatal("nextIndex Error")
-				nextIndex = rf.log.LastIncludedIndex + 1
+				go rf.SendInstallSnapshot(server)
+				return
 			}
 			prevLog := rf.log.LogIndexMap(nextIndex - 1)
 			var args = AppendEntriesArg{
@@ -571,10 +566,8 @@ func (rf *Raft) LeaderSendOneEntry(server int, args *AppendEntriesArg) {
 			//retry
 			nextIndex := rf.nextIndex[server]
 			if nextIndex <= rf.log.LastIncludedIndex {
-				// go rf.SendInstallSnapshot(server)
-				// return
-				log.Fatal("nextIndex Error")
-				nextIndex = rf.log.LastIncludedIndex + 1
+				go rf.SendInstallSnapshot(server)
+				return
 			}
 			prevLog := rf.log.LogIndexMap(nextIndex - 1)
 			var newargs = AppendEntriesArg{
@@ -638,6 +631,11 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArg, reply *AppendEntriesReply)
 	}
 	rf.ResetElectionTime()
 
+	if args.PrevLogIndex < rf.commitIndex {
+		reply.Success = false
+		reply.Conflict = false
+		return
+	}
 	//append entries
 	//rule 2: Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm
 	if rf.log.LastLogIndex() < args.PrevLogIndex || rf.log.LogIndexMap(args.PrevLogIndex).Term != args.PrevLogTerm {
@@ -782,7 +780,7 @@ func (rf *Raft) applier() {
 		var tmpLog Logs
 		tmpCommitIndex := rf.commitIndex
 		tmpLog.LogCopy(&rf.log)
-		DebugLog(dTimer, "S%d T%d copy temp log, start %d, len %d", rf.me, rf.currentTerm, rf.log.LastIncludedIndex, rf.log.LogLength())
+		// DebugLog(dTimer, "S%d T%d copy temp log, start %d, len %d", rf.me, rf.currentTerm, rf.log.LastIncludedIndex, rf.log.LogLength())
 		for {
 			if tmpCommitIndex > rf.lastApplied {
 				rf.lastApplied += 1
