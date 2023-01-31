@@ -163,6 +163,7 @@ const (
 	Follower RaftState = iota + 1
 	Candidate
 	Leader
+	Resetting
 )
 
 // A Go object implementing a single Raft peer.
@@ -288,13 +289,29 @@ type InstallSnapshotArg struct {
 	LeaderId          int
 	LastIncludedIndex int
 	LastIncludedTerm  int
-	Offset            int
 	Data              []byte
-	Done              bool
+	// Offset            int
+	// Done              bool
+	// unused
 }
 
 type InstallSnapshotReply struct {
 	Term int
+}
+
+func (rf *Raft) SendInstallSnapshot(server int) {
+	args := InstallSnapshotArg{
+		Term:              rf.currentTerm,
+		LeaderId:          rf.leader,
+		LastIncludedIndex: rf.log.LastIncludedIndex,
+		LastIncludedTerm:  rf.log.LastIncludedTerm,
+		Data:              rf.persister.ReadSnapshot(),
+	}
+	var reply InstallSnapshotReply
+	rf.SendInstallSnapshotRPC(server, &args, &reply)
+	if rf.UpdateTerm(reply.Term) {
+		return
+	}
 }
 
 func (rf *Raft) SendInstallSnapshotRPC(server int, args *InstallSnapshotArg, reply *InstallSnapshotReply) bool {
@@ -319,6 +336,13 @@ func (rf *Raft) InstallSnapshot(args InstallSnapshotArg, reply InstallSnapshotRe
 		e := labgob.NewEncoder(w)
 		e.Encode(args.Data)
 		rf.persister.SaveStateAndSnapshot(rf.getPersistData(), w.Bytes())
+
+		if args.LastIncludedTerm == rf.log.LogIndexMap(args.LastIncludedIndex).Term {
+			// If existing log entry has same index and term as snapshot’s last included entry, retain log entries following it and reply
+			return
+		}
+
+		rf.log.Log = make([]LogEntry, 0)
 
 		msg := ApplyMsg{
 			SnapshotValid: true,
@@ -350,7 +374,7 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	// Your code here (2D).
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	if rf.log.LastIncludedIndex >= index || index > rf.lastApplied || index > rf.log.LastLogIndex() {
+	if rf.log.LastIncludedIndex >= index || index != rf.lastApplied || index > rf.log.LastLogIndex() {
 		return
 	}
 
