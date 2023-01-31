@@ -464,12 +464,12 @@ func (rf *Raft) LeaderSendHeartbeats(server int) {
 }
 
 func (rf *Raft) LeaderSendEntries() {
-	for id := range rf.peers {
-		if id == rf.me {
+	for server := range rf.peers {
+		if server == rf.me {
 			rf.ResetElectionTime()
 			continue
 		}
-		nextIndex := rf.nextIndex[id]
+		nextIndex := rf.nextIndex[server]
 		if rf.log.LastLogIndex() >= nextIndex {
 			prevLog := rf.log.LogIndexMap(nextIndex - 1)
 			var args = AppendEntriesArg{
@@ -481,7 +481,7 @@ func (rf *Raft) LeaderSendEntries() {
 				LeaderCommit: rf.commitIndex,
 			}
 			copy(args.Entries, rf.log.LogToEnd(nextIndex))
-			go rf.LeaderSendOneEntry(id, &args)
+			go rf.LeaderSendOneEntry(server, &args)
 		}
 	}
 
