@@ -358,13 +358,14 @@ func (rf *Raft) LeaderSendHeartbeats() {
 		}
 		nextIndex := rf.nextIndex[server]
 		if nextIndex <= rf.log.LastIncludedIndex {
-			go rf.SendInstallSnapshot(server, &InstallSnapshotArg{
-				Term:              rf.currentTerm,
-				LeaderId:          rf.me,
-				LastIncludedIndex: rf.log.LastIncludedIndex,
-				LastIncludedTerm:  rf.log.LastIncludedTerm,
-				Data:              rf.persister.ReadSnapshot(),
-			})
+			// go rf.SendInstallSnapshot(server, &InstallSnapshotArg{
+			// 	Term:              rf.currentTerm,
+			// 	LeaderId:          rf.me,
+			// 	LastIncludedIndex: rf.log.LastIncludedIndex,
+			// 	LastIncludedTerm:  rf.log.LastIncludedTerm,
+			// 	Data:              rf.persister.ReadSnapshot(),
+			// })
+			// return
 			nextIndex = rf.log.LastIncludedIndex + 1
 		}
 		prevLog := rf.log.LogIndexMap(nextIndex - 1)
@@ -394,13 +395,14 @@ func (rf *Raft) LeaderSendEntries() {
 		nextIndex := rf.nextIndex[server]
 		if rf.log.LastLogIndex() >= nextIndex {
 			if nextIndex <= rf.log.LastIncludedIndex {
-				go rf.SendInstallSnapshot(server, &InstallSnapshotArg{
-					Term:              rf.currentTerm,
-					LeaderId:          rf.me,
-					LastIncludedIndex: rf.log.LastIncludedIndex,
-					LastIncludedTerm:  rf.log.LastIncludedTerm,
-					Data:              rf.persister.ReadSnapshot(),
-				})
+				// go rf.SendInstallSnapshot(server, &InstallSnapshotArg{
+				// 	Term:              rf.currentTerm,
+				// 	LeaderId:          rf.me,
+				// 	LastIncludedIndex: rf.log.LastIncludedIndex,
+				// 	LastIncludedTerm:  rf.log.LastIncludedTerm,
+				// 	Data:              rf.persister.ReadSnapshot(),
+				// })
+				// return
 				nextIndex = rf.log.LastIncludedIndex + 1
 			}
 			prevLog := rf.log.LogIndexMap(nextIndex - 1)
@@ -467,13 +469,14 @@ func (rf *Raft) LeaderSendOneEntry(server int, args *AppendEntriesArg) {
 			//retry
 			nextIndex := rf.nextIndex[server]
 			if nextIndex <= rf.log.LastIncludedIndex {
-				go rf.SendInstallSnapshot(server, &InstallSnapshotArg{
-					Term:              rf.currentTerm,
-					LeaderId:          rf.me,
-					LastIncludedIndex: rf.log.LastIncludedIndex,
-					LastIncludedTerm:  rf.log.LastIncludedTerm,
-					Data:              rf.persister.ReadSnapshot(),
-				})
+				// go rf.SendInstallSnapshot(server, &InstallSnapshotArg{
+				// 	Term:              rf.currentTerm,
+				// 	LeaderId:          rf.me,
+				// 	LastIncludedIndex: rf.log.LastIncludedIndex,
+				// 	LastIncludedTerm:  rf.log.LastIncludedTerm,
+				// 	Data:              rf.persister.ReadSnapshot(),
+				// })
+				// return
 				nextIndex = rf.log.LastIncludedIndex + 1
 			}
 			prevLog := rf.log.LogIndexMap(nextIndex - 1)
