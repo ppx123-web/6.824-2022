@@ -9,8 +9,9 @@ trap 'kill -INT -$pid; exit 1' INT
 
 runs=$1
 tests=$2
-log=log.txt
-test=test.txt
+dir=tmp
+log=$dir/log.txt
+test=$dir/test.txt
 
 testcases=(Persist12C Persist22C Persist32C Figure82C UnreliableAgree2C Figure8Unreliable2C ReliableChurn2C UnreliableChurn2C)
 
