@@ -29,6 +29,14 @@ import (
 	"6.824/labrpc"
 )
 
+type RaftState int
+
+const (
+	Follower RaftState = iota + 1
+	Candidate
+	Leader
+)
+
 func min(a, b int) int {
 	if a < b {
 		return a

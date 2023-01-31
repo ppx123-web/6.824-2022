@@ -86,12 +86,3 @@ func LogUpToDate(lastLogTerm1, lastLogIndex1, lastLogTerm2, lastLogIndex2 int) b
 	}
 
 }
-
-type RaftState int
-
-const (
-	Follower RaftState = iota + 1
-	Candidate
-	Leader
-	Resetting
-)
