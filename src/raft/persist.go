@@ -37,7 +37,6 @@ func (rf *Raft) readPersist(data []byte) {
 		rf.votedFor = votedFor
 		rf.log.LogCopy(&log)
 		rf.commitIndex = rf.log.LastIncludedIndex
-		rf.lastApplied = rf.log.LastIncludedIndex
 		DebugLog(dPersist, "S%d T%d Read persistant Success, log length %d", rf.me, rf.currentTerm, rf.log.LogLength())
 	}
 }

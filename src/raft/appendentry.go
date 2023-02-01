@@ -105,18 +105,23 @@ func (rf *Raft) LeaderSendOneEntry(server int, args *AppendEntriesArg) {
 			DebugLog(dDrop, "S%d T%d -> S%d Entry Conflict, current T%d", args.LeaderId, args.Term, server, rf.currentTerm)
 			//retry
 			nextIndex := rf.nextIndex[server]
-			prevLog := rf.log.get(nextIndex - 1)
-			var newargs = AppendEntriesArg{
-				Term:         rf.currentTerm,
-				LeaderId:     rf.me,
-				PrevLogIndex: nextIndex - 1,
-				PrevLogTerm:  prevLog.Term,
-				Entries:      make([]LogEntry, rf.log.LastLogIndex()-nextIndex+1),
-				LeaderCommit: rf.commitIndex,
+			if nextIndex <= rf.log.LastIncludedIndex {
+				go rf.SendInstallSnapshot(server, rf.newInstallSnapshotArgs())
+			} else if rf.log.LastLogIndex() >= nextIndex {
+				prevLog := rf.log.get(nextIndex - 1)
+				var newargs = AppendEntriesArg{
+					Term:         rf.currentTerm,
+					LeaderId:     rf.me,
+					PrevLogIndex: nextIndex - 1,
+					PrevLogTerm:  prevLog.Term,
+					Entries:      make([]LogEntry, rf.log.LastLogIndex()-nextIndex+1),
+					LeaderCommit: rf.commitIndex,
+				}
+				copy(newargs.Entries, rf.log.LogToEnd(nextIndex))
+				DebugLog(dDrop, "S%d T%d -> S%d Retry AppEnt PLI: %d PLT %d LC: %d ", rf.me, rf.currentTerm, server, newargs.PrevLogIndex, newargs.PrevLogTerm, newargs.LeaderCommit)
+				go rf.LeaderSendOneEntry(server, &newargs)
 			}
-			copy(newargs.Entries, rf.log.LogToEnd(nextIndex))
-			DebugLog(dDrop, "S%d T%d -> S%d Retry AppEnt PLI: %d PLT %d LC: %d ", rf.me, rf.currentTerm, server, newargs.PrevLogIndex, newargs.PrevLogTerm, newargs.LeaderCommit)
-			go rf.LeaderSendOneEntry(server, &newargs)
+
 		}
 	}
 
@@ -229,18 +234,22 @@ func (rf *Raft) applier() {
 		time.Sleep(10 * time.Millisecond)
 
 		rf.mu.Lock()
-		if rf.lastApplied < rf.log.LastIncludedIndex {
-			msg := ApplyMsg{
-				SnapshotValid: true,
-				Snapshot:      rf.persister.ReadSnapshot(),
-				SnapshotIndex: rf.log.LastIncludedIndex,
-				SnapshotTerm:  rf.log.LastIncludedTerm,
+		for {
+			if rf.lastApplied < rf.log.LastIncludedIndex {
+				msg := ApplyMsg{
+					SnapshotValid: true,
+					Snapshot:      rf.persister.ReadSnapshot(),
+					SnapshotIndex: rf.log.LastIncludedIndex,
+					SnapshotTerm:  rf.log.LastIncludedTerm,
+				}
+				DebugLog(dSnap, "S%d T%d apply snapshot, LII %d, LIT %d", rf.me, rf.currentTerm, msg.SnapshotIndex, msg.SnapshotTerm)
+				rf.mu.Unlock()
+				rf.applyCh <- msg
+				rf.mu.Lock()
+				rf.lastApplied = msg.SnapshotIndex
+			} else {
+				break
 			}
-			DebugLog(dSnap, "S%d T%d apply snapshot, LII %d, LIT %d", rf.me, rf.currentTerm, msg.SnapshotIndex, msg.SnapshotTerm)
-			rf.mu.Unlock()
-			rf.applyCh <- msg
-			rf.mu.Lock()
-			rf.lastApplied = rf.log.LastIncludedIndex
 		}
 
 		var tmpLog Logs

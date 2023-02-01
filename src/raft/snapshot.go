@@ -49,6 +49,7 @@ func (rf *Raft) newInstallSnapshotArgs() (args *InstallSnapshotArg) {
 }
 
 func (rf *Raft) saveStateSnapshot(lastIncludedIndex, lastIncludedTerm int, snapshot []byte) {
+	DebugLog(dSnap, "S%d T%d save log LLI %d -> %d", rf.me, rf.currentTerm, rf.log.LastIncludedIndex, lastIncludedIndex)
 	tmplog := &Logs{
 		LastIncludedIndex: lastIncludedIndex,
 		LastIncludedTerm:  lastIncludedTerm,
@@ -98,18 +99,21 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArg, reply *InstallSnapshot
 	DebugLog(dSnap, "S%d T%d Get snapshot from S%d T%d, LII %d, LIT %d", rf.me, rf.currentTerm, args.LeaderId, args.Term, args.LastIncludedIndex, args.LastIncludedTerm)
 
 	if args.LastIncludedIndex > rf.commitIndex && args.LastIncludedIndex >= rf.log.LastIncludedIndex {
-		rf.saveStateSnapshot(args.LastIncludedIndex, args.LastIncludedTerm, args.Data)
-		rf.commitIndex = args.LastIncludedIndex
 
 		DebugLog(dSnap, "S%d T%d update snapshot file, LII %d, LIT %d", rf.me, rf.currentTerm, args.LastIncludedIndex, args.LastIncludedTerm)
 
 		if rf.log.get(args.LastIncludedIndex) != nil && args.LastIncludedTerm == rf.log.get(args.LastIncludedIndex).Term {
 			// If existing log entry has same index and term as snapshot’s last included entry, retain log entries following it and reply
+			rf.saveStateSnapshot(args.LastIncludedIndex, args.LastIncludedTerm, args.Data)
+			rf.commitIndex = args.LastIncludedIndex
 			DebugLog(dSnap, "S%d T%d snapshot retain log", rf.me, rf.currentTerm)
 			return
 		}
 
 		rf.log.Log = make([]LogEntry, 0)
+		rf.log.LastIncludedIndex = args.LastIncludedIndex
+		rf.log.LastIncludedTerm = args.LastIncludedTerm
+		rf.saveStateSnapshot(args.LastIncludedIndex, args.LastIncludedTerm, args.Data)
 		rf.commitIndex = args.LastIncludedIndex
 		return
 	}
@@ -121,7 +125,7 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArg, reply *InstallSnapshot
 func (rf *Raft) CondInstallSnapshot(lastIncludedTerm int, lastIncludedIndex int, snapshot []byte) bool {
 	// Your code here (2D).
 	// Previously, this lab recommended that you implement a function called CondInstallSnapshot to avoid the requirement that snapshots and log entries sent on applyCh are coordinated. This vestigal API interface remains, but you are discouraged from implementing it: instead, we suggest that you simply have it return true.
-	DebugLog(dSnap, "S%d T%d apply snapshot, LII %d, LIT %d", rf.me, rf.currentTerm, lastIncludedIndex, lastIncludedTerm)
+	DebugLog(dSnap, "S%d T%d CondInstallSnapshot, LII %d, LIT %d", rf.me, rf.currentTerm, lastIncludedIndex, lastIncludedTerm)
 	return true
 }
 
