@@ -30,9 +30,9 @@ type RequestVoteReply struct {
 // example RequestVote RPC handler.
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
-	DebugLog(dVote, "S%d T%d <- S%d T%d, get vote request", rf.me, rf.currentTerm, args.CandidateId, args.Term)
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
+	DebugLog(dVote, "S%d T%d <- S%d T%d, get vote request", rf.me, rf.currentTerm, args.CandidateId, args.Term)
 	lastTerm := rf.currentTerm
 	rf.UpdateTerm(args.Term)
 	if args.Term < lastTerm {

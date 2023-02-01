@@ -125,6 +125,8 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArg, reply *InstallSnapshot
 func (rf *Raft) CondInstallSnapshot(lastIncludedTerm int, lastIncludedIndex int, snapshot []byte) bool {
 	// Your code here (2D).
 	// Previously, this lab recommended that you implement a function called CondInstallSnapshot to avoid the requirement that snapshots and log entries sent on applyCh are coordinated. This vestigal API interface remains, but you are discouraged from implementing it: instead, we suggest that you simply have it return true.
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
 	DebugLog(dSnap, "S%d T%d CondInstallSnapshot, LII %d, LIT %d", rf.me, rf.currentTerm, lastIncludedIndex, lastIncludedTerm)
 	return true
 }
