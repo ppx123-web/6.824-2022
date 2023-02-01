@@ -40,16 +40,10 @@ func (rf *Raft) LeaderSendEntries(heartbeat bool) {
 			continue
 		}
 		nextIndex := rf.nextIndex[server]
-		if rf.log.LastLogIndex() >= nextIndex || heartbeat {
+		if nextIndex <= rf.log.LastIncludedIndex {
+			go rf.SendInstallSnapshot(server, rf.newInstallSnapshotArgs())
+		} else if rf.log.LastLogIndex() >= nextIndex || heartbeat {
 			if nextIndex <= rf.log.LastIncludedIndex {
-				// go rf.SendInstallSnapshot(server, &InstallSnapshotArg{
-				// 	Term:              rf.currentTerm,
-				// 	LeaderId:          rf.me,
-				// 	LastIncludedIndex: rf.log.LastIncludedIndex,
-				// 	LastIncludedTerm:  rf.log.LastIncludedTerm,
-				// 	Data:              rf.persister.ReadSnapshot(),
-				// })
-				// return
 				nextIndex = rf.log.LastIncludedIndex + 1
 			}
 			prevLog := rf.log.get(nextIndex - 1)
@@ -233,7 +227,22 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArg, reply *AppendEntriesReply)
 func (rf *Raft) applier() {
 	for !rf.killed() {
 		time.Sleep(10 * time.Millisecond)
+
 		rf.mu.Lock()
+		if rf.lastApplied < rf.log.LastIncludedIndex {
+			msg := ApplyMsg{
+				SnapshotValid: true,
+				Snapshot:      rf.persister.ReadSnapshot(),
+				SnapshotIndex: rf.log.LastIncludedIndex,
+				SnapshotTerm:  rf.log.LastIncludedTerm,
+			}
+			DebugLog(dSnap, "S%d T%d apply snapshot, LII %d, LIT %d", rf.me, rf.currentTerm, msg.SnapshotIndex, msg.SnapshotTerm)
+			rf.mu.Unlock()
+			rf.applyCh <- msg
+			rf.mu.Lock()
+			rf.lastApplied = rf.log.LastIncludedIndex
+		}
+
 		var tmpLog Logs
 		tmpCommitIndex := rf.commitIndex
 		tmpLog.LogCopy(&rf.log)

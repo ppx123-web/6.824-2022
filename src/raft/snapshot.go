@@ -17,15 +17,9 @@ package raft
 //   in the same server.
 //
 
-import (
-	//	"bytes"
+//	"bytes"
 
-	"bytes"
-
-	//	"6.824/labgob"
-
-	"6.824/labgob"
-)
+//	"6.824/labgob"
 
 type InstallSnapshotArg struct {
 	Term              int
@@ -54,7 +48,17 @@ func (rf *Raft) newInstallSnapshotArgs() (args *InstallSnapshotArg) {
 	return args
 }
 
-func (rf *Raft) SendInstallSnapshot(server int, args *InstallSnapshotArg) (bool, *InstallSnapshotReply) {
+func (rf *Raft) saveStateSnapshot(lastIncludedIndex, lastIncludedTerm int, snapshot []byte) {
+	tmplog := &Logs{
+		LastIncludedIndex: lastIncludedIndex,
+		LastIncludedTerm:  lastIncludedTerm,
+		Log:               rf.log.LogToEnd(lastIncludedIndex + 1),
+	}
+	rf.log.LogCopy(tmplog)
+	rf.persister.SaveStateAndSnapshot(rf.getPersistData(), snapshot)
+}
+
+func (rf *Raft) SendInstallSnapshot(server int, args *InstallSnapshotArg) {
 	rf.mu.Lock()
 	DebugLog(dSnap, "S%d T%d Send snapshot to S%d, LII %d, LIT %d", rf.me, rf.currentTerm, server, args.LastIncludedIndex, args.LastIncludedTerm)
 	rf.mu.Unlock()
@@ -64,16 +68,14 @@ func (rf *Raft) SendInstallSnapshot(server int, args *InstallSnapshotArg) (bool,
 	defer rf.mu.Unlock()
 	if ok {
 		if rf.UpdateTerm(reply.Term) {
-			return ok, &reply
+			return
 		}
 		if rf.currentTerm != args.Term || rf.state != Leader {
-			return ok, &reply
+			return
 		}
 		rf.nextIndex[server] = args.LastIncludedIndex + 1
 		rf.matchIndex[server] = args.LastIncludedIndex
 	}
-
-	return ok, &reply
 }
 
 func (rf *Raft) SendInstallSnapshotRPC(server int, args *InstallSnapshotArg, reply *InstallSnapshotReply) bool {
@@ -93,16 +95,15 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArg, reply *InstallSnapshot
 	}
 	rf.ResetElectionTime()
 
-	prevLastIncludeIndex := rf.log.LastIncludedIndex
 	DebugLog(dSnap, "S%d T%d Get snapshot from S%d T%d, LII %d, LIT %d", rf.me, rf.currentTerm, args.LeaderId, args.Term, args.LastIncludedIndex, args.LastIncludedTerm)
 
-	if args.LastIncludedIndex > rf.commitIndex && args.LastIncludedIndex >= prevLastIncludeIndex {
-		w := new(bytes.Buffer)
-		e := labgob.NewEncoder(w)
-		e.Encode(args.Data)
-		rf.persister.SaveStateAndSnapshot(rf.getPersistData(), w.Bytes())
+	if args.LastIncludedIndex > rf.commitIndex && args.LastIncludedIndex >= rf.log.LastIncludedIndex {
+		rf.saveStateSnapshot(args.LastIncludedIndex, args.LastIncludedTerm, args.Data)
+		rf.commitIndex = args.LastIncludedIndex
+
 		DebugLog(dSnap, "S%d T%d update snapshot file, LII %d, LIT %d", rf.me, rf.currentTerm, args.LastIncludedIndex, args.LastIncludedTerm)
-		if args.LastIncludedIndex <= rf.log.LastIncludedIndex && args.LastIncludedTerm == rf.log.get(args.LastIncludedIndex).Term {
+
+		if rf.log.get(args.LastIncludedIndex) != nil && args.LastIncludedTerm == rf.log.get(args.LastIncludedIndex).Term {
 			// If existing log entry has same index and term as snapshot’s last included entry, retain log entries following it and reply
 			DebugLog(dSnap, "S%d T%d snapshot retain log", rf.me, rf.currentTerm)
 			return
@@ -110,17 +111,7 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArg, reply *InstallSnapshot
 
 		rf.log.Log = make([]LogEntry, 0)
 		rf.commitIndex = args.LastIncludedIndex
-
-		msg := ApplyMsg{
-			SnapshotValid: true,
-			Snapshot:      args.Data,
-			SnapshotIndex: args.LastIncludedIndex,
-			SnapshotTerm:  args.LastIncludedTerm,
-		}
-
-		go func() {
-			rf.applyCh <- msg
-		}()
+		return
 	}
 
 }
@@ -147,14 +138,8 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 		return
 	}
 
-	tmpLogs := Logs{
-		Log:               rf.log.LogToEnd(index + 1),
-		LastIncludedIndex: index,
-		LastIncludedTerm:  rf.log.get(index).Term,
-	}
-	rf.log.LogCopy(&tmpLogs)
-	DebugLog(dSnap, "S%d T%d Snapshot index %d, log start at %d, log length %d", rf.me, rf.currentTerm, index, rf.log.LastIncludedIndex, rf.log.LogLength())
+	rf.saveStateSnapshot(index, rf.log.get(index).Term, snapshot)
 
-	rf.persister.SaveStateAndSnapshot(rf.getPersistData(), snapshot)
+	DebugLog(dSnap, "S%d T%d Snapshot index %d, log start at %d, log length %d", rf.me, rf.currentTerm, index, rf.log.LastIncludedIndex, rf.log.LogLength())
 
 }
