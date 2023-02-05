@@ -132,6 +132,7 @@ func (rf *Raft) CandidateRequestVotes(index int, votes *int, args *RequestVoteAr
 			*isleader = true
 			rf.nextIndex = make([]int, len(rf.peers))
 			rf.matchIndex = make([]int, len(rf.peers))
+			rf.leader = rf.me
 			for i := range rf.peers {
 				rf.nextIndex[i] = rf.log.LastLogIndex() + 1
 				rf.matchIndex[i] = 0

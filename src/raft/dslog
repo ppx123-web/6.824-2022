@@ -23,6 +23,7 @@ TOPICS = {
     "SNAP": "#FD971F",
     "DROP": "#ff615c",
     "CLNT": "#00813c",
+    "KVRA": "#fe2c79",
     "TEST": "#fe2c79",
     "INFO": "#ffffff",
     "WARN": "#d08341",

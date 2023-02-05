@@ -172,6 +172,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArg, reply *AppendEntriesReply)
 		rf.state = Follower
 	}
 	rf.ResetElectionTime()
+	rf.leader = args.LeaderId
 	//append entries
 	//rule 2: Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm
 	prevLog := rf.log.get(args.PrevLogIndex)

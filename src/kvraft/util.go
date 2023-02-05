@@ -1,4 +1,4 @@
-package raft
+package kvraft
 
 import (
 	"fmt"
@@ -80,7 +80,7 @@ func Fatal(s string) {
 }
 
 func NeedTopic(topic logTopic) bool {
-	if topic == dLeader || topic == dCommit {
+	if topic == dLeader || topic == dCommit || topic == dClient || topic == dKVraft || topic == dTimer {
 		return true
 	} else {
 		return false

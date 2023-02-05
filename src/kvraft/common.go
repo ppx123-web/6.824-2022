@@ -16,18 +16,35 @@ type PutAppendArgs struct {
 	// You'll have to add definitions here.
 	// Field names must start with capital letters,
 	// otherwise RPC will break.
+	ClerkId int
+	Seq     int
 }
 
 type PutAppendReply struct {
-	Err Err
+	Err      Err
+	Index    int
+	IsLeader bool
+	LeaderId int
 }
 
 type GetArgs struct {
-	Key string
+	Key     string
+	ClerkId int
+	Seq     int
 	// You'll have to add definitions here.
 }
 
 type GetReply struct {
-	Err   Err
-	Value string
+	Err      Err
+	Value    string
+	IsLeader bool
+	LeaderId int
+}
+
+type GetStateArgs struct {
+	ClerkId int
+}
+
+type GetStateReply struct {
+	IsLeader bool
 }
