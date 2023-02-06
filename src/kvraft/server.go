@@ -46,7 +46,7 @@ type KVServer struct {
 	Inform      map[int]chan informCh
 }
 
-func (kv *KVServer) CheckInform(Index int, ClerkId int, Seq int) {
+func (kv *KVServer) CheckInform(Index int, ClerkId int, Seq int) chan informCh {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 	if _, ok := kv.Inform[Index]; !ok {
@@ -56,6 +56,7 @@ func (kv *KVServer) CheckInform(Index int, ClerkId int, Seq int) {
 	if _, ok := kv.Maxreq[ClerkId]; !ok {
 		kv.Maxreq[ClerkId] = 0
 	}
+	return kv.Inform[Index]
 }
 
 func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
@@ -69,9 +70,9 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 	})
 	reply.LeaderId = kv.rf.GetLeader()
 	if isLeader {
-		kv.CheckInform(index, args.ClerkId, args.Seq)
+		ch := kv.CheckInform(index, args.ClerkId, args.Seq)
 		select {
-		case info := <-kv.Inform[index]:
+		case info := <-ch:
 			reply.Err = Err(info.Err)
 			reply.Value = info.Value
 		case <-time.After(50 * time.Millisecond):
@@ -96,9 +97,9 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 	reply.Index = index
 	reply.LeaderId = kv.rf.GetLeader()
 	if isLeader {
-		kv.CheckInform(index, args.ClerkId, args.Seq)
+		ch := kv.CheckInform(index, args.ClerkId, args.Seq)
 		select {
-		case info := <-kv.Inform[index]:
+		case info := <-ch:
 			reply.Err = Err(info.Err)
 		case <-time.After(50 * time.Millisecond):
 			reply.Err = "Timeout"
@@ -150,6 +151,7 @@ func (kv *KVServer) applier() {
 		cmd := <-kv.applyCh
 		op := cmd.Command.(Op)
 		if cmd.CommandValid {
+			kv.mu.Lock()
 			if cmd.CommandIndex <= kv.lastApplied {
 				DebugLog(dKVraft, "S%d KV index %d duplicate", kv.me, cmd.CommandIndex)
 				continue
@@ -191,7 +193,6 @@ func (kv *KVServer) applier() {
 				log.Fatal("Error cmd")
 			}
 			_, isLeader := kv.rf.GetState()
-			kv.mu.Lock()
 			ch, ok := kv.Inform[cmd.CommandIndex]
 			if ok && isLeader {
 				DebugLog(dKVraft, "S%d KV notify index %d", kv.me, cmd.CommandIndex)
