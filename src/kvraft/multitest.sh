@@ -15,4 +15,4 @@ nums=$1
 testname=$2
 EXEC_PARAMS=${@:4}
 echo Test $2 $1 trials with $threads threads
-./dtest -v -o ./tmp -n $nums -p $threads $EXEC_PARAMS $testname
+./dtest -v -v -o ./tmp -n $nums -p $threads $EXEC_PARAMS $testname
