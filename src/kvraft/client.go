@@ -15,6 +15,7 @@ type Clerk struct {
 	leaderId int
 	me       int
 	seq      int
+	mu       sync.Mutex
 }
 
 var ClerkId = 0
@@ -43,15 +44,17 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 	return ck
 }
 
-func (ck *Clerk) FindLeader() {
-	for index, server := range ck.servers {
-		var reply GetStateReply
-		ok := server.Call("KVServer.GetState", &GetStateArgs{}, &reply)
-		if ok && reply.IsLeader {
-			ck.leaderId = index
-			return
-		}
-	}
+func (ck *Clerk) FindLeader(leaderId int) {
+	ck.leaderId = (ck.leaderId + 1) % len(ck.servers)
+	DebugLog(dClient, "C%d set LeaderId %d", ck.me, ck.leaderId)
+}
+
+func (ck *Clerk) AllocateIndex() int {
+	ck.mu.Lock()
+	ck.seq++
+	ret := ck.seq
+	ck.mu.Unlock()
+	return ret
 }
 
 // fetch the current value for a key.
@@ -66,22 +69,29 @@ func (ck *Clerk) FindLeader() {
 // arguments. and reply must be passed as a pointer.
 func (ck *Clerk) Get(key string) string {
 	var args = GetArgs{
-		Key: key,
+		Key:     key,
+		ClerkId: ck.me,
+		Seq:     ck.AllocateIndex(),
 	}
 	for {
 		var reply GetReply
-		DebugLog(dClient, "C%d Get key:%v to KV%d", ck.me, key, ck.leaderId)
+		DebugLog(dClient, "C%d Get key:%v", ck.me, key)
 		ok := ck.servers[ck.leaderId].Call("KVServer.Get", &args, &reply)
-		if ok && reply.IsLeader {
-			return reply.Value
+		if ok {
+			switch reply.Err {
+			case "Duplicate":
+				return reply.Value
+			case "":
+				return reply.Value
+			case "Not Match":
+				DebugLog(dClient, "C%d Get Fail %v, retry", ck.me, reply.Err)
+			case "Not Leader":
+				ck.FindLeader(reply.LeaderId)
+				time.Sleep(10 * time.Millisecond)
+			}
+		} else {
+			ck.leaderId = (ck.leaderId + 1) % len(ck.servers)
 		}
-		if ok && !reply.IsLeader {
-			ck.FindLeader()
-			DebugLog(dClient, "C%d Leader ID %d", ck.me, ck.leaderId)
-			time.Sleep(10 * time.Millisecond)
-			continue
-		}
-		ck.leaderId = int(nrand()) % len(ck.servers)
 	}
 
 }
@@ -101,21 +111,27 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 		Value:   value,
 		Op:      op,
 		ClerkId: ck.me,
+		Seq:     ck.AllocateIndex(),
 	}
 	for {
 		var reply PutAppendReply
-		DebugLog(dClient, "C%d PutAppend %v %v to KV %d", ck.me, key, value, ck.leaderId)
+		DebugLog(dClient, "C%d PutAppend %v %v to %d", ck.me, key, value, ck.leaderId)
 		ok := ck.servers[ck.leaderId].Call("KVServer.PutAppend", &args, &reply)
-		if ok && reply.IsLeader {
-			break
+		if ok {
+			switch reply.Err {
+			case "Duplicate":
+				return
+			case "":
+				return
+			case "Not Match":
+				DebugLog(dClient, "C%d Get Fail %v, retry", ck.me, reply.Err)
+			case "Not Leader":
+				ck.FindLeader(reply.LeaderId)
+				time.Sleep(10 * time.Millisecond)
+			}
+		} else {
+			ck.leaderId = (ck.leaderId + 1) % len(ck.servers)
 		}
-		if ok && !reply.IsLeader {
-			ck.FindLeader()
-			DebugLog(dClient, "C%d Leader ID %d", ck.me, ck.leaderId)
-			time.Sleep(10 * time.Millisecond)
-			continue
-		}
-		ck.leaderId = int(nrand()) % len(ck.servers)
 	}
 
 }

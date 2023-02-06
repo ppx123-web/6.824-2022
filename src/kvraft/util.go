@@ -64,7 +64,7 @@ func init() {
 }
 
 func DebugLog(topic logTopic, format string, a ...interface{}) {
-	if debugVerbosity >= 0 && NeedTopic(topic) {
+	if debugVerbosity&2 != 0 {
 		// f, _ := os.OpenFile("tmp/log.txt", os.O_CREATE|os.O_RDWR|os.O_APPEND, os.ModePerm)
 		// log.SetOutput(f)
 		time := time.Since(debugStart).Microseconds()
@@ -77,12 +77,4 @@ func DebugLog(topic logTopic, format string, a ...interface{}) {
 
 func Fatal(s string) {
 	log.Fatal(s)
-}
-
-func NeedTopic(topic logTopic) bool {
-	if topic == dLeader || topic == dCommit || topic == dClient || topic == dKVraft || topic == dTimer {
-		return true
-	} else {
-		return false
-	}
 }

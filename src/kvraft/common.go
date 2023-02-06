@@ -23,7 +23,6 @@ type PutAppendArgs struct {
 type PutAppendReply struct {
 	Err      Err
 	Index    int
-	IsLeader bool
 	LeaderId int
 }
 
@@ -37,7 +36,6 @@ type GetArgs struct {
 type GetReply struct {
 	Err      Err
 	Value    string
-	IsLeader bool
 	LeaderId int
 }
 
