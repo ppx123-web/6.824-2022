@@ -74,6 +74,10 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 		select {
 		case info := <-ch:
 			reply.Err = Err(info.Err)
+			kv.mu.Lock()
+			close(ch)
+			delete(kv.Inform, index)
+			kv.mu.Unlock()
 			reply.Value = info.Value
 		case <-time.After(50 * time.Millisecond):
 			reply.Err = "Timeout"
@@ -101,9 +105,13 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 		select {
 		case info := <-ch:
 			reply.Err = Err(info.Err)
+			kv.mu.Lock()
+			close(ch)
+			delete(kv.Inform, index)
+			kv.mu.Unlock()
 		case <-time.After(50 * time.Millisecond):
 			reply.Err = "Timeout"
-			DebugLog(dKVraft, "S%d KV PutAppend %v", kv.me, reply.Err)
+			DebugLog(dKVraft, "S%d KV PutAppend reply err %v", kv.me, reply.Err)
 		}
 	} else {
 		reply.Err = "Not Leader"
