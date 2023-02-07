@@ -52,3 +52,7 @@ func (rf *Raft) getPersistData() []byte {
 	}
 	return w.Bytes()
 }
+
+func (rf *Raft) RaftStateSize() int {
+	return rf.persister.RaftStateSize()
+}

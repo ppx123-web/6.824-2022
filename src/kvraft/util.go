@@ -38,6 +38,7 @@ const (
 	dClient logTopic = "CLNT"
 	dKVraft logTopic = "KVRA"
 	dInfo   logTopic = "INFO"
+	dError  logTopic = "ERRO"
 )
 
 var debugStart time.Time

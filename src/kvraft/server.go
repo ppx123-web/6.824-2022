@@ -1,6 +1,7 @@
 package kvraft
 
 import (
+	"bytes"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -135,6 +136,50 @@ func (kv *KVServer) CheckClerkOpDuplicate(Clerk, Seq int) bool {
 	}
 }
 
+func (kv *KVServer) CheckSnapshot() bool {
+	if kv.maxraftstate == -1 {
+		return false
+	}
+	if kv.rf.RaftStateSize() >= kv.maxraftstate {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (kv *KVServer) DecodeSnapshot(cmd *raft.ApplyMsg) {
+	data := cmd.Snapshot
+	r := bytes.NewBuffer(data)
+	d := labgob.NewDecoder(r)
+	var lastApplied int
+	var Maxreq map[int]int
+	var table map[string]string
+	e1 := d.Decode(&lastApplied)
+	e2 := d.Decode(&Maxreq)
+	e3 := d.Decode(&table)
+	if e1 != nil || e2 != nil || e3 != nil {
+		DebugLog(dError, "S%d T%d Read persistant fails, T:%v V:%v L:%v", kv.me, e1, e2, e3)
+	} else {
+		if kv.rf.CondInstallSnapshot(cmd.SnapshotIndex, cmd.SnapshotTerm, cmd.Snapshot) {
+			kv.lastApplied = lastApplied
+			kv.Maxreq = Maxreq
+			kv.table = table
+		}
+	}
+}
+
+func (kv *KVServer) CreateSnapshot() []byte {
+	w := new(bytes.Buffer)
+	e := labgob.NewEncoder(w)
+	e1 := e.Encode(&kv.lastApplied)
+	e2 := e.Encode(&kv.Maxreq)
+	e3 := e.Encode(&kv.table)
+	if e1 != nil || e2 != nil || e3 != nil {
+		DebugLog(dError, "S%d KV get persist data fail, %v %v %v", kv.me, e1, e2, e3)
+	}
+	return w.Bytes()
+}
+
 // the tester calls Kill() when a KVServer instance won't
 // be needed again. for your convenience, we supply
 // code to set rf.dead (without needing a lock),
@@ -157,9 +202,9 @@ func (kv *KVServer) killed() bool {
 func (kv *KVServer) applier() {
 	for !kv.killed() {
 		cmd := <-kv.applyCh
-		op := cmd.Command.(Op)
 		if cmd.CommandValid {
 			kv.mu.Lock()
+			op := cmd.Command.(Op)
 			if cmd.CommandIndex <= kv.lastApplied {
 				DebugLog(dKVraft, "S%d KV index %d duplicate", kv.me, cmd.CommandIndex)
 				continue
@@ -208,6 +253,14 @@ func (kv *KVServer) applier() {
 			} else {
 				DebugLog(dKVraft, "S%d KV has no ch in %d or isn't leader", kv.me, cmd.CommandIndex)
 			}
+			if kv.CheckSnapshot() {
+				kv.rf.Snapshot(kv.lastApplied, kv.CreateSnapshot())
+			}
+			kv.mu.Unlock()
+		}
+		if cmd.SnapshotValid {
+			kv.mu.Lock()
+			kv.DecodeSnapshot(&cmd)
 			kv.mu.Unlock()
 		}
 	}
