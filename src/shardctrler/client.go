@@ -4,14 +4,19 @@ package shardctrler
 // Shardctrler clerk.
 //
 
-import "6.824/labrpc"
-import "time"
-import "crypto/rand"
-import "math/big"
+import (
+	"crypto/rand"
+	"math/big"
+	"time"
+
+	"6.824/labrpc"
+)
 
 type Clerk struct {
 	servers []*labrpc.ClientEnd
 	// Your data here.
+	ClerkId int
+	Seq     int
 }
 
 func nrand() int64 {
@@ -25,13 +30,23 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 	ck := new(Clerk)
 	ck.servers = servers
 	// Your code here.
+	ck.ClerkId = int(nrand())
+	ck.Seq = 0
 	return ck
 }
 
+func (ck *Clerk) AllocateIndex() int {
+	ck.Seq++
+	return ck.Seq
+}
+
 func (ck *Clerk) Query(num int) Config {
-	args := &QueryArgs{}
+	args := &QueryArgs{
+		Num:     num,
+		ClerkId: ck.ClerkId,
+		Seq:     ck.AllocateIndex(),
+	}
 	// Your code here.
-	args.Num = num
 	for {
 		// try each known server.
 		for _, srv := range ck.servers {
@@ -46,7 +61,10 @@ func (ck *Clerk) Query(num int) Config {
 }
 
 func (ck *Clerk) Join(servers map[int][]string) {
-	args := &JoinArgs{}
+	args := &JoinArgs{
+		ClerkId: ck.ClerkId,
+		Seq:     ck.AllocateIndex(),
+	}
 	// Your code here.
 	args.Servers = servers
 
@@ -64,7 +82,10 @@ func (ck *Clerk) Join(servers map[int][]string) {
 }
 
 func (ck *Clerk) Leave(gids []int) {
-	args := &LeaveArgs{}
+	args := &LeaveArgs{
+		ClerkId: ck.ClerkId,
+		Seq:     ck.AllocateIndex(),
+	}
 	// Your code here.
 	args.GIDs = gids
 
@@ -82,7 +103,10 @@ func (ck *Clerk) Leave(gids []int) {
 }
 
 func (ck *Clerk) Move(shard int, gid int) {
-	args := &MoveArgs{}
+	args := &MoveArgs{
+		ClerkId: ck.ClerkId,
+		Seq:     ck.AllocateIndex(),
+	}
 	// Your code here.
 	args.Shard = shard
 	args.GID = gid
