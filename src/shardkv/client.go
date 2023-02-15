@@ -132,6 +132,9 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 				if ok && reply.Err == OK {
 					return
 				}
+				if ok && reply.Err == ErrDuplicate {
+					return
+				}
 				if ok && reply.Err == ErrWrongGroup {
 					break
 				}

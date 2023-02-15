@@ -207,6 +207,7 @@ func (kv *KVServer) applier() {
 			op := cmd.Command.(Op)
 			if cmd.CommandIndex <= kv.lastApplied {
 				DebugLog(dKVraft, "S%d KV index %d duplicate", kv.me, cmd.CommandIndex)
+				kv.mu.Unlock()
 				continue
 			}
 			kv.lastApplied = cmd.CommandIndex

@@ -24,7 +24,7 @@ type Op struct {
 }
 
 type informCh struct {
-	Err     string
+	Err     Err
 	Cmd     string
 	Value   string
 	ClerkId int
@@ -61,6 +61,7 @@ func (kv *ShardKV) CheckInform(Index int, ClerkId int, Seq int) chan informCh {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 	if _, ok := kv.Inform[Index]; !ok {
+		DebugLog(dKVraft, "S%d KV make chan for C%d", kv.me, Index)
 		kv.Inform[Index] = make(chan informCh, 1)
 	}
 	if _, ok := kv.Maxreq[ClerkId]; !ok {
@@ -92,10 +93,12 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) {
 			kv.mu.Unlock()
 			reply.Value = info.Value
 		case <-time.After(50 * time.Millisecond):
-			reply.Err = "Timeout"
+			DebugLog(dKVraft, "S%d KV Get reply err %v", kv.me, reply.Err)
+			reply.Err = ErrTimeOut
 		}
 	} else {
-		reply.Err = "ErrWrongLeader"
+		reply.Err = ErrWrongLeader
+		DebugLog(dKVraft, "S%d KV Not Leader", kv.me)
 	}
 }
 
@@ -121,10 +124,12 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 			delete(kv.Inform, index)
 			kv.mu.Unlock()
 		case <-time.After(50 * time.Millisecond):
-			reply.Err = "Timeout"
+			DebugLog(dKVraft, "S%d KV Get reply err %v", kv.me, reply.Err)
+			reply.Err = ErrTimeOut
 		}
 	} else {
-		reply.Err = "ErrWrongLeader"
+		reply.Err = ErrWrongLeader
+		DebugLog(dKVraft, "S%d KV Not Leader", kv.me)
 	}
 }
 
@@ -161,6 +166,8 @@ func (kv *ShardKV) applier() {
 			kv.mu.Lock()
 			op := cmd.Command.(Op)
 			if cmd.CommandIndex <= kv.lastApplied {
+				DebugLog(dKVraft, "S%d KV index %d duplicate", kv.me, cmd.CommandIndex)
+				kv.mu.Unlock()
 				continue
 			}
 			kv.lastApplied = cmd.CommandIndex
@@ -168,7 +175,7 @@ func (kv *ShardKV) applier() {
 				Cmd:     op.Cmd,
 				ClerkId: op.ClerkId,
 				Seq:     op.Seq,
-				Err:     "",
+				Err:     OK,
 			}
 			switch op.Cmd {
 			case "Get":
@@ -176,22 +183,26 @@ func (kv *ShardKV) applier() {
 					info.Value = v
 				} else {
 					info.Value = ""
+					info.Err = ErrNoKey
 				}
+				DebugLog(dKVraft, "S%d KV apply %v, index %d", kv.me, op, cmd.CommandIndex)
 			case "Put":
 				if kv.CheckClerkOpDuplicate(op.ClerkId, op.Seq) {
-					info.Err = "Duplicate"
+					info.Err = ErrDuplicate
 				} else {
 					kv.table[op.Key] = op.Value
+					DebugLog(dKVraft, "S%d KV apply %v, index %d", kv.me, op.Cmd, cmd.CommandIndex)
 				}
 			case "Append":
 				if kv.CheckClerkOpDuplicate(op.ClerkId, op.Seq) {
-					info.Err = "Duplicate"
+					info.Err = ErrDuplicate
 				} else {
 					if v, ok := kv.table[op.Key]; ok {
 						kv.table[op.Key] = v + op.Value
 					} else {
 						kv.table[op.Key] = op.Value
 					}
+					DebugLog(dKVraft, "S%d KV apply %v, index %d", kv.me, op.Cmd, cmd.CommandIndex)
 				}
 			default:
 				log.Fatal("Error cmd")
@@ -199,7 +210,10 @@ func (kv *ShardKV) applier() {
 			_, isLeader := kv.rf.GetState()
 			ch, ok := kv.Inform[cmd.CommandIndex]
 			if ok && isLeader {
+				DebugLog(dKVraft, "S%d KV notify index %d", kv.me, cmd.CommandIndex)
 				ch <- info
+			} else {
+				DebugLog(dKVraft, "S%d KV has no ch in %d or isn't leader", kv.me, cmd.CommandIndex)
 			}
 			kv.mu.Unlock()
 		}

@@ -14,6 +14,8 @@ const (
 	ErrNoKey       = "ErrNoKey"
 	ErrWrongGroup  = "ErrWrongGroup"
 	ErrWrongLeader = "ErrWrongLeader"
+	ErrDuplicate   = "ErrDuplicate"
+	ErrTimeOut     = "ErrTimeOut"
 )
 
 type Err string
