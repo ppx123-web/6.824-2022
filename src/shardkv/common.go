@@ -31,6 +31,7 @@ type PutAppendArgs struct {
 	// otherwise RPC will break.
 	ClerkId int
 	Seq     int
+	Shard   int
 }
 
 type PutAppendReply struct {
@@ -42,9 +43,23 @@ type GetArgs struct {
 	// You'll have to add definitions here.
 	ClerkId int
 	Seq     int
+	Shard   int
 }
 
 type GetReply struct {
 	Err   Err
 	Value string
+}
+
+type ShardTransferArg struct {
+	ConfigN int
+	Shard   int
+}
+
+type ShardTransferReply struct {
+	Err    Err
+	Succ   bool
+	Table  map[string]string
+	Maxreq map[int]int
+	Shard  int
 }

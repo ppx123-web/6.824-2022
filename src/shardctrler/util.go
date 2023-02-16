@@ -35,10 +35,10 @@ func getVerbosity() int {
 type logTopic string
 
 const (
-	dClient logTopic = "CLNT"
-	dKVraft logTopic = "KVRA"
-	dInfo   logTopic = "INFO"
-	dError  logTopic = "ERRO"
+	dCtrlClient logTopic = "CLNT"
+	dCtrl       logTopic = "KVRA"
+	dInfo       logTopic = "INFO"
+	dError      logTopic = "ERRO"
 )
 
 var debugStart time.Time
@@ -51,6 +51,7 @@ func init() {
 }
 
 func DebugLog(topic logTopic, format string, a ...interface{}) {
+	return
 	if debugVerbosity&2 != 0 {
 		// f, _ := os.OpenFile("tmp/log.txt", os.O_CREATE|os.O_RDWR|os.O_APPEND, os.ModePerm)
 		// log.SetOutput(f)

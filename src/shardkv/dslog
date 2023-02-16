@@ -12,6 +12,7 @@ from rich.traceback import install
 # fmt: off
 # Mapping from topics to colors
 TOPICS = {
+    "KVRA": "#fe2626",
     "TIMR": "#9a9a99",
     "VOTE": "#67a0b2",
     "LEAD": "#d0b343",
@@ -78,7 +79,7 @@ def main(
             # any particular peer. Otherwise we can treat second column
             # as peer id
             if topic != "TEST":
-                i = int(msg[1])
+                i = int(msg[3])
 
             # Colorize output by using rich syntax when needed
             if colorize and topic in TOPICS:

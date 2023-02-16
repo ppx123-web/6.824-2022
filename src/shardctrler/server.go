@@ -31,7 +31,7 @@ func (sc *ShardCtrler) CheckInform(Index int, ClerkId int, Seq int) chan informC
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 	if _, ok := sc.Inform[Index]; !ok {
-		DebugLog(dKVraft, "S%d KV make chan for C%d", sc.me, Index)
+		DebugLog(dCtrl, "S%d KV make chan for C%d", sc.me, Index)
 		sc.Inform[Index] = make(chan informCh, 1)
 	}
 	if _, ok := sc.Maxreq[ClerkId]; !ok {
@@ -71,7 +71,7 @@ type Op struct {
 
 func (sc *ShardCtrler) Join(args *JoinArgs, reply *JoinReply) {
 	// Your code here.
-	DebugLog(dKVraft, "S%d KV Join %d, ClerkId %d,Seq %d", sc.me, args.Servers, args.ClerkId, args.Seq)
+	DebugLog(dCtrl, "S%d KV Join %d, ClerkId %d,Seq %d", sc.me, args.Servers, args.ClerkId, args.Seq)
 	index, _, isLeader := sc.rf.Start(Op{
 		ClerkId: args.ClerkId,
 		Seq:     args.Seq,
@@ -89,18 +89,18 @@ func (sc *ShardCtrler) Join(args *JoinArgs, reply *JoinReply) {
 			sc.mu.Unlock()
 		case <-time.After(200 * time.Millisecond):
 			reply.Err = "Timeout"
-			DebugLog(dKVraft, "S%d KV Join reply err %v", sc.me, reply.Err)
+			DebugLog(dCtrl, "S%d KV Join reply err %v", sc.me, reply.Err)
 		}
 	} else {
 		reply.Err = "Not Leader"
 		reply.WrongLeader = true
-		DebugLog(dKVraft, "S%d KV Not Leader", sc.me)
+		DebugLog(dCtrl, "S%d KV Not Leader", sc.me)
 	}
 }
 
 func (sc *ShardCtrler) Leave(args *LeaveArgs, reply *LeaveReply) {
 	// Your code here.
-	DebugLog(dKVraft, "S%d KV Leave %d, ClerkId %d,Seq %d", sc.me, args.GIDs, args.ClerkId, args.Seq)
+	DebugLog(dCtrl, "S%d KV Leave %d, ClerkId %d,Seq %d", sc.me, args.GIDs, args.ClerkId, args.Seq)
 	index, _, isLeader := sc.rf.Start(Op{
 		ClerkId: args.ClerkId,
 		Seq:     args.Seq,
@@ -118,18 +118,18 @@ func (sc *ShardCtrler) Leave(args *LeaveArgs, reply *LeaveReply) {
 			sc.mu.Unlock()
 		case <-time.After(200 * time.Millisecond):
 			reply.Err = "Timeout"
-			DebugLog(dKVraft, "S%d KV Leave reply err %v", sc.me, reply.Err)
+			DebugLog(dCtrl, "S%d KV Leave reply err %v", sc.me, reply.Err)
 		}
 	} else {
 		reply.Err = "Not Leader"
 		reply.WrongLeader = true
-		DebugLog(dKVraft, "S%d KV Not Leader", sc.me)
+		DebugLog(dCtrl, "S%d KV Not Leader", sc.me)
 	}
 }
 
 func (sc *ShardCtrler) Move(args *MoveArgs, reply *MoveReply) {
 	// Your code here.
-	DebugLog(dKVraft, "S%d KV Move S%d -> G%d, ClerkId %d,Seq %d", sc.me, args.Shard, args.GID, args.ClerkId, args.Seq)
+	DebugLog(dCtrl, "S%d KV Move S%d -> G%d, ClerkId %d,Seq %d", sc.me, args.Shard, args.GID, args.ClerkId, args.Seq)
 	index, _, isLeader := sc.rf.Start(Op{
 		ClerkId: args.ClerkId,
 		Seq:     args.Seq,
@@ -148,18 +148,18 @@ func (sc *ShardCtrler) Move(args *MoveArgs, reply *MoveReply) {
 			sc.mu.Unlock()
 		case <-time.After(200 * time.Millisecond):
 			reply.Err = "Timeout"
-			DebugLog(dKVraft, "S%d KV Move reply err %v", sc.me, reply.Err)
+			DebugLog(dCtrl, "S%d KV Move reply err %v", sc.me, reply.Err)
 		}
 	} else {
 		reply.Err = "Not Leader"
 		reply.WrongLeader = true
-		DebugLog(dKVraft, "S%d KV Not Leader", sc.me)
+		DebugLog(dCtrl, "S%d KV Not Leader", sc.me)
 	}
 }
 
 func (sc *ShardCtrler) Query(args *QueryArgs, reply *QueryReply) {
 	// Your code here.
-	DebugLog(dKVraft, "S%d KV Query %d, ClerkId %d,Seq %d", sc.me, args.Num, args.ClerkId, args.Seq)
+	DebugLog(dCtrl, "S%d KV Query %d, ClerkId %d,Seq %d", sc.me, args.Num, args.ClerkId, args.Seq)
 	index, _, isLeader := sc.rf.Start(Op{
 		ClerkId: args.ClerkId,
 		Seq:     args.Seq,
@@ -178,12 +178,12 @@ func (sc *ShardCtrler) Query(args *QueryArgs, reply *QueryReply) {
 			sc.mu.Unlock()
 		case <-time.After(200 * time.Millisecond):
 			reply.Err = "Timeout"
-			DebugLog(dKVraft, "S%d KV Query reply err %v", sc.me, reply.Err)
+			DebugLog(dCtrl, "S%d KV Query reply err %v", sc.me, reply.Err)
 		}
 	} else {
 		reply.Err = "Not Leader"
 		reply.WrongLeader = true
-		DebugLog(dKVraft, "S%d KV Not Leader", sc.me)
+		DebugLog(dCtrl, "S%d KV Not Leader", sc.me)
 	}
 }
 
@@ -213,7 +213,7 @@ func (sc *ShardCtrler) applier() {
 			sc.mu.Lock()
 			op := cmd.Command.(Op)
 			if cmd.CommandIndex <= sc.lastApplied {
-				DebugLog(dKVraft, "S%d KV index %d duplicate", sc.me, cmd.CommandIndex)
+				DebugLog(dCtrl, "S%d KV index %d duplicate", sc.me, cmd.CommandIndex)
 				continue
 			}
 			sc.lastApplied = cmd.CommandIndex
@@ -226,32 +226,32 @@ func (sc *ShardCtrler) applier() {
 			switch op.Cmd {
 			case Join:
 				if !sc.CheckClerkOpDuplicate(info.ClerkId, info.Seq) {
-					DebugLog(dKVraft, "S%d KV Join %v", sc.me, op.Servers)
+					DebugLog(dCtrl, "S%d KV Join %v", sc.me, op.Servers)
 					sc.JoinOperation(op.Servers)
 				}
 			case Leave:
 				if !sc.CheckClerkOpDuplicate(info.ClerkId, info.Seq) {
-					DebugLog(dKVraft, "S%d KV Leave %v", sc.me, op.GIDs)
+					DebugLog(dCtrl, "S%d KV Leave %v", sc.me, op.GIDs)
 					sc.LeaveOperation(op.GIDs)
 				}
 			case Move:
 				if !sc.CheckClerkOpDuplicate(info.ClerkId, info.Seq) {
-					DebugLog(dKVraft, "S%d KV Move %v %v", sc.me, op.Shard, op.GID)
+					DebugLog(dCtrl, "S%d KV Move %v %v", sc.me, op.Shard, op.GID)
 					sc.MoveOperation(op.Shard, op.GID)
 				}
 			case Query:
 				info.reply = sc.Queryperation(op.Num)
-				DebugLog(dKVraft, "S%d KV Query %v, %v, Shards %v", sc.me, op.Num, info.reply.Groups, info.reply.Shards)
+				DebugLog(dCtrl, "S%d KV Query %v, %v, Shards %v", sc.me, op.Num, info.reply.Groups, info.reply.Shards)
 			default:
 				log.Fatal("Error cmd")
 			}
 			_, isLeader := sc.rf.GetState()
 			ch, ok := sc.Inform[cmd.CommandIndex]
 			if ok && isLeader {
-				DebugLog(dKVraft, "S%d KV notify index %d", sc.me, cmd.CommandIndex)
+				DebugLog(dCtrl, "S%d KV notify index %d", sc.me, cmd.CommandIndex)
 				ch <- info
 			} else {
-				DebugLog(dKVraft, "S%d KV has no ch in %d or isn't leader", sc.me, cmd.CommandIndex)
+				DebugLog(dCtrl, "S%d KV has no ch in %d or isn't leader", sc.me, cmd.CommandIndex)
 			}
 			sc.mu.Unlock()
 		}

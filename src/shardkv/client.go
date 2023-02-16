@@ -82,10 +82,11 @@ func (ck *Clerk) Get(key string) string {
 		Key:     key,
 		ClerkId: ck.me,
 		Seq:     ck.AllocateIndex(),
+		Shard:   key2shard(key),
 	}
 
 	for {
-		shard := key2shard(key)
+		shard := args.Shard
 		gid := ck.config.Shards[shard]
 		if servers, ok := ck.config.Groups[gid]; ok {
 			// try each server for the shard.
@@ -119,10 +120,11 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 		Op:      op,
 		ClerkId: ck.me,
 		Seq:     ck.AllocateIndex(),
+		Shard:   key2shard(key),
 	}
 
 	for {
-		shard := key2shard(key)
+		shard := args.Shard
 		gid := ck.config.Shards[shard]
 		if servers, ok := ck.config.Groups[gid]; ok {
 			for si := 0; si < len(servers); si++ {

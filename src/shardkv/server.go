@@ -1,7 +1,6 @@
 package shardkv
 
 import (
-	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -48,12 +47,17 @@ type ShardKV struct {
 	table       map[string]string
 	Maxreq      map[int]int
 	Inform      map[int]chan informCh
+	cfg         shardctrler.Config
+	ShardDB     map[int]map[int]map[string]string // config -> shard -> table
+	Respon      [shardctrler.NShards]bool         // offer service for shard
+	InShard     map[int]int                       // shard -> cfg.Num
+	UpdateCh    chan bool
+	CanPullCfg  bool
 }
 
 func (kv *ShardKV) CheckShardsGid(key string) bool {
 	shard := key2shard(key)
-	config := kv.mck.Query(-1)
-	gid := config.Shards[shard]
+	gid := kv.cfg.Shards[shard]
 	return kv.gid == gid
 }
 
@@ -61,7 +65,7 @@ func (kv *ShardKV) CheckInform(Index int, ClerkId int, Seq int) chan informCh {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 	if _, ok := kv.Inform[Index]; !ok {
-		DebugLog(dKVraft, "S%d KV make chan for C%d", kv.me, Index)
+		DebugLog(dKVraft, "G%d S%d KV make chan for C%d", kv.gid, kv.me, Index)
 		kv.Inform[Index] = make(chan informCh, 1)
 	}
 	if _, ok := kv.Maxreq[ClerkId]; !ok {
@@ -83,6 +87,7 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) {
 		Value:   "",
 	})
 	if isLeader {
+		DebugLog(dKVraft, "G%d S%d KV Get %v, shard %d, index %d", kv.gid, kv.me, args.Key, args.Shard, index)
 		ch := kv.CheckInform(index, args.ClerkId, args.Seq)
 		select {
 		case info := <-ch:
@@ -93,12 +98,12 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) {
 			kv.mu.Unlock()
 			reply.Value = info.Value
 		case <-time.After(50 * time.Millisecond):
-			DebugLog(dKVraft, "S%d KV Get reply err %v", kv.me, reply.Err)
+			DebugLog(dKVraft, "G%d S%d KV Get reply err %v", kv.gid, reply.Err)
 			reply.Err = ErrTimeOut
 		}
 	} else {
 		reply.Err = ErrWrongLeader
-		DebugLog(dKVraft, "S%d KV Not Leader", kv.me)
+		DebugLog(dKVraft, "G%d S%d KV Not Leader", kv.gid, kv.me)
 	}
 }
 
@@ -106,6 +111,7 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 	// Your code here.
 	if !kv.CheckShardsGid(args.Key) {
 		reply.Err = ErrWrongGroup
+		return
 	}
 	index, _, isLeader := kv.rf.Start(Op{
 		ClerkId: args.ClerkId,
@@ -115,6 +121,7 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 		Value:   args.Value,
 	})
 	if isLeader {
+		DebugLog(dKVraft, "G%d S%d KV Get %v, shard %d, index %d", kv.gid, kv.me, args.Key, args.Shard, index)
 		ch := kv.CheckInform(index, args.ClerkId, args.Seq)
 		select {
 		case info := <-ch:
@@ -124,12 +131,12 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 			delete(kv.Inform, index)
 			kv.mu.Unlock()
 		case <-time.After(50 * time.Millisecond):
-			DebugLog(dKVraft, "S%d KV Get reply err %v", kv.me, reply.Err)
+			DebugLog(dKVraft, "G%d S%d KV Get reply err %v", kv.gid, kv.me, reply.Err)
 			reply.Err = ErrTimeOut
 		}
 	} else {
 		reply.Err = ErrWrongLeader
-		DebugLog(dKVraft, "S%d KV Not Leader", kv.me)
+		DebugLog(dKVraft, "G%d S%d KV Not Leader", kv.gid, kv.me)
 	}
 }
 
@@ -147,77 +154,20 @@ func (kv *ShardKV) killed() bool {
 	return z == 1
 }
 
-func (kv *ShardKV) CheckClerkOpDuplicate(Clerk, Seq int) bool {
-	if _, ok := kv.Maxreq[Clerk]; !ok {
-		kv.Maxreq[Clerk] = 0
+func copyStr2Str(m map[string]string) map[string]string {
+	ret := make(map[string]string)
+	for k, v := range m {
+		ret[k] = v
 	}
-	if kv.Maxreq[Clerk] >= Seq {
-		return true
-	} else {
-		kv.Maxreq[Clerk] = Seq
-		return false
-	}
+	return ret
 }
 
-func (kv *ShardKV) applier() {
-	for !kv.killed() {
-		cmd := <-kv.applyCh
-		if cmd.CommandValid {
-			kv.mu.Lock()
-			op := cmd.Command.(Op)
-			if cmd.CommandIndex <= kv.lastApplied {
-				DebugLog(dKVraft, "S%d KV index %d duplicate", kv.me, cmd.CommandIndex)
-				kv.mu.Unlock()
-				continue
-			}
-			kv.lastApplied = cmd.CommandIndex
-			var info = informCh{
-				Cmd:     op.Cmd,
-				ClerkId: op.ClerkId,
-				Seq:     op.Seq,
-				Err:     OK,
-			}
-			switch op.Cmd {
-			case "Get":
-				if v, ok := kv.table[op.Key]; ok {
-					info.Value = v
-				} else {
-					info.Value = ""
-					info.Err = ErrNoKey
-				}
-				DebugLog(dKVraft, "S%d KV apply %v, index %d", kv.me, op, cmd.CommandIndex)
-			case "Put":
-				if kv.CheckClerkOpDuplicate(op.ClerkId, op.Seq) {
-					info.Err = ErrDuplicate
-				} else {
-					kv.table[op.Key] = op.Value
-					DebugLog(dKVraft, "S%d KV apply %v, index %d", kv.me, op.Cmd, cmd.CommandIndex)
-				}
-			case "Append":
-				if kv.CheckClerkOpDuplicate(op.ClerkId, op.Seq) {
-					info.Err = ErrDuplicate
-				} else {
-					if v, ok := kv.table[op.Key]; ok {
-						kv.table[op.Key] = v + op.Value
-					} else {
-						kv.table[op.Key] = op.Value
-					}
-					DebugLog(dKVraft, "S%d KV apply %v, index %d", kv.me, op.Cmd, cmd.CommandIndex)
-				}
-			default:
-				log.Fatal("Error cmd")
-			}
-			_, isLeader := kv.rf.GetState()
-			ch, ok := kv.Inform[cmd.CommandIndex]
-			if ok && isLeader {
-				DebugLog(dKVraft, "S%d KV notify index %d", kv.me, cmd.CommandIndex)
-				ch <- info
-			} else {
-				DebugLog(dKVraft, "S%d KV has no ch in %d or isn't leader", kv.me, cmd.CommandIndex)
-			}
-			kv.mu.Unlock()
-		}
+func copyInt2Int(m map[int]int) map[int]int {
+	ret := make(map[int]int)
+	for k, v := range m {
+		ret[k] = v
 	}
+	return ret
 }
 
 // servers[] contains the ports of the servers in this group.
@@ -250,6 +200,8 @@ func StartServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister,
 	// call labgob.Register on structures you want
 	// Go's RPC library to marshall/unmarshall.
 	labgob.Register(Op{})
+	labgob.Register(shardctrler.Config{})
+	labgob.Register(ShardTransferReply{})
 
 	kv := new(ShardKV)
 	kv.me = me
@@ -271,7 +223,15 @@ func StartServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister,
 	kv.Maxreq = make(map[int]int)
 	kv.lastApplied = 0
 
+	kv.cfg = shardctrler.Config{}
+	kv.ShardDB = make(map[int]map[int]map[string]string)
+	kv.InShard = make(map[int]int)
+	kv.UpdateCh = make(chan bool)
+	kv.CanPullCfg = true
+
+	go kv.WatchConfig()
 	go kv.applier()
+	go kv.pullShards()
 
 	return kv
 }

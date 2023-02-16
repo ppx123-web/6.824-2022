@@ -1,0 +1,587 @@
+                                                          G101 S0 start config 1                                                                                           
+                                                          G101 S0 Update Config to 1, need map[], out []                                                                   
+                                                          G101 S2 Update Config to 1, need map[], out []                                                                   
+                                                          G101 S1 Update Config to 1, need map[], out []                                                                   
+G100 S1 start config 1                                                                                                                                                     
+G100 S1 Update Config to 1, need map[], out []                                                                                                                             
+                                                                                                                   G102 S1 start config 1                                  
+G100 S2 Update Config to 1, need map[], out []                                                                                                                             
+G100 S0 Update Config to 1, need map[], out []                                                                                                                             
+                                                                                                                   G102 S1 Update Config to 1, need map[], out []          
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 0, shard 8, index 2                                                                                                                                         
+G100 S1 KV make chan for C2                                                                                                                                                
+G100 S1 KV apply {3683038670782709994 1 Put 0 LsLZ-},                                                                                                                      
+shard 8, index 2                                                                                                                                                           
+G100 S1 KV notify index 2                                                                                                                                                  
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 1, shard 9, index 3                                                                                                                                         
+G100 S1 KV make chan for C3                                                                                                                                                
+G100 S0 KV apply {3683038670782709994 1 Put 0 LsLZ-},                                                                                                                      
+shard 8, index 2                                                                                                                                                           
+G100 S2 KV apply {3683038670782709994 1 Put 0 LsLZ-},                                                                                                                      
+shard 8, index 2                                                                                                                                                           
+G100 S1 KV apply {3683038670782709994 2 Put 1 Twovq},                                                                                                                      
+shard 9, index 3                                                                                                                                                           
+G100 S1 KV notify index 3                                                                                                                                                  
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 2, shard 0, index 4                                                                                                                                         
+G100 S1 KV make chan for C4                                                                                                                                                
+G100 S2 KV apply {3683038670782709994 2 Put 1 Twovq},                                                                                                                      
+shard 9, index 3                                                                                                                                                           
+G100 S0 KV apply {3683038670782709994 2 Put 1 Twovq},                                                                                                                      
+shard 9, index 3                                                                                                                                                           
+G100 S1 KV apply {3683038670782709994 3 Put 2 RYZfr},                                                                                                                      
+shard 0, index 4                                                                                                                                                           
+G100 S1 KV notify index 4                                                                                                                                                  
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 3, shard 1, index 5                                                                                                                                         
+G100 S1 KV make chan for C5                                                                                                                                                
+G100 S0 KV apply {3683038670782709994 3 Put 2 RYZfr},                                                                                                                      
+shard 0, index 4                                                                                                                                                           
+G100 S2 KV apply {3683038670782709994 3 Put 2 RYZfr},                                                                                                                      
+shard 0, index 4                                                                                                                                                           
+G100 S1 KV apply {3683038670782709994 4 Put 3 l9WOy},                                                                                                                      
+shard 1, index 5                                                                                                                                                           
+G100 S1 KV notify index 5                                                                                                                                                  
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 4, shard 2, index 6                                                                                                                                         
+G100 S1 KV make chan for C6                                                                                                                                                
+G100 S0 KV apply {3683038670782709994 4 Put 3 l9WOy},                                                                                                                      
+shard 1, index 5                                                                                                                                                           
+                                                                                                                   G102 S0 Update Config to 1, need map[], out []          
+                                                                                                                   G102 S2 Update Config to 1, need map[], out []          
+G100 S2 KV apply {3683038670782709994 4 Put 3 l9WOy},                                                                                                                      
+shard 1, index 5                                                                                                                                                           
+G100 S1 KV apply {3683038670782709994 5 Put 4 ZWnJc},                                                                                                                      
+shard 2, index 6                                                                                                                                                           
+G100 S1 KV notify index 6                                                                                                                                                  
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 5, shard 3, index 7                                                                                                                                         
+G100 S1 KV make chan for C7                                                                                                                                                
+G100 S2 KV apply {3683038670782709994 5 Put 4 ZWnJc},                                                                                                                      
+shard 2, index 6                                                                                                                                                           
+G100 S0 KV apply {3683038670782709994 5 Put 4 ZWnJc},                                                                                                                      
+shard 2, index 6                                                                                                                                                           
+G100 S1 KV apply {3683038670782709994 6 Put 5 FHNIx},                                                                                                                      
+shard 3, index 7                                                                                                                                                           
+G100 S1 KV notify index 7                                                                                                                                                  
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 6, shard 4, index 8                                                                                                                                         
+G100 S1 KV make chan for C8                                                                                                                                                
+G100 S2 KV apply {3683038670782709994 6 Put 5 FHNIx},                                                                                                                      
+shard 3, index 7                                                                                                                                                           
+G100 S0 KV apply {3683038670782709994 6 Put 5 FHNIx},                                                                                                                      
+shard 3, index 7                                                                                                                                                           
+G100 S1 KV apply {3683038670782709994 7 Put 6 ArDSO},                                                                                                                      
+shard 4, index 8                                                                                                                                                           
+G100 S1 KV notify index 8                                                                                                                                                  
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 7, shard 5, index 9                                                                                                                                         
+G100 S1 KV make chan for C9                                                                                                                                                
+G100 S0 KV apply {3683038670782709994 7 Put 6 ArDSO},                                                                                                                      
+shard 4, index 8                                                                                                                                                           
+G100 S2 KV apply {3683038670782709994 7 Put 6 ArDSO},                                                                                                                      
+shard 4, index 8                                                                                                                                                           
+G100 S1 KV apply {3683038670782709994 8 Put 7 auY-G},                                                                                                                      
+shard 5, index 9                                                                                                                                                           
+G100 S1 KV notify index 9                                                                                                                                                  
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 8, shard 6, index 10                                                                                                                                        
+G100 S1 KV make chan for C10                                                                                                                                               
+G100 S0 KV apply {3683038670782709994 8 Put 7 auY-G},                                                                                                                      
+shard 5, index 9                                                                                                                                                           
+G100 S2 KV apply {3683038670782709994 8 Put 7 auY-G},                                                                                                                      
+shard 5, index 9                                                                                                                                                           
+G100 S1 KV apply {3683038670782709994 9 Put 8 1m1xT},                                                                                                                      
+shard 6, index 10                                                                                                                                                          
+G100 S1 KV notify index 10                                                                                                                                                 
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 9, shard 7, index 11                                                                                                                                        
+G100 S1 KV make chan for C11                                                                                                                                               
+G100 S2 KV apply {3683038670782709994 9 Put 8 1m1xT},                                                                                                                      
+shard 6, index 10                                                                                                                                                          
+G100 S0 KV apply {3683038670782709994 9 Put 8 1m1xT},                                                                                                                      
+shard 6, index 10                                                                                                                                                          
+G100 S1 KV apply {3683038670782709994 10 Put 9 Tm07V},                                                                                                                     
+shard 7, index 11                                                                                                                                                          
+G100 S1 KV notify index 11                                                                                                                                                 
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 0, shard 8, index 12                                                                                                                                        
+G100 S1 KV make chan for C12                                                                                                                                               
+G100 S0 KV apply {3683038670782709994 10 Put 9 Tm07V},                                                                                                                     
+shard 7, index 11                                                                                                                                                          
+G100 S2 KV apply {3683038670782709994 10 Put 9 Tm07V},                                                                                                                     
+shard 7, index 11                                                                                                                                                          
+G100 S1 KV apply {3683038670782709994 11 Get 0 }, shard                                                                                                                    
+8, index 12                                                                                                                                                                
+G100 S1 KV notify index 12                                                                                                                                                 
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 1, shard 9, index 13                                                                                                                                        
+G100 S1 KV make chan for C13                                                                                                                                               
+G100 S2 KV apply {3683038670782709994 11 Get 0 }, shard                                                                                                                    
+8, index 12                                                                                                                                                                
+G100 S0 KV apply {3683038670782709994 11 Get 0 }, shard                                                                                                                    
+8, index 12                                                                                                                                                                
+G100 S1 KV apply {3683038670782709994 12 Get 1 }, shard                                                                                                                    
+9, index 13                                                                                                                                                                
+G100 S1 KV notify index 13                                                                                                                                                 
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 2, shard 0, index 14                                                                                                                                        
+G100 S1 KV make chan for C14                                                                                                                                               
+G100 S2 KV apply {3683038670782709994 12 Get 1 }, shard                                                                                                                    
+9, index 13                                                                                                                                                                
+G100 S0 KV apply {3683038670782709994 12 Get 1 }, shard                                                                                                                    
+9, index 13                                                                                                                                                                
+G100 S1 KV apply {3683038670782709994 13 Get 2 }, shard                                                                                                                    
+0, index 14                                                                                                                                                                
+G100 S1 KV notify index 14                                                                                                                                                 
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 3, shard 1, index 15                                                                                                                                        
+G100 S1 KV make chan for C15                                                                                                                                               
+G100 S2 KV apply {3683038670782709994 13 Get 2 }, shard                                                                                                                    
+0, index 14                                                                                                                                                                
+G100 S0 KV apply {3683038670782709994 13 Get 2 }, shard                                                                                                                    
+0, index 14                                                                                                                                                                
+G100 S1 KV apply {3683038670782709994 14 Get 3 }, shard                                                                                                                    
+1, index 15                                                                                                                                                                
+G100 S1 KV notify index 15                                                                                                                                                 
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 4, shard 2, index 16                                                                                                                                        
+G100 S1 KV make chan for C16                                                                                                                                               
+G100 S2 KV apply {3683038670782709994 14 Get 3 }, shard                                                                                                                    
+1, index 15                                                                                                                                                                
+G100 S0 KV apply {3683038670782709994 14 Get 3 }, shard                                                                                                                    
+1, index 15                                                                                                                                                                
+G100 S1 KV apply {3683038670782709994 15 Get 4 }, shard                                                                                                                    
+2, index 16                                                                                                                                                                
+G100 S1 KV notify index 16                                                                                                                                                 
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 5, shard 3, index 17                                                                                                                                        
+G100 S1 KV make chan for C17                                                                                                                                               
+G100 S0 KV apply {3683038670782709994 15 Get 4 }, shard                                                                                                                    
+2, index 16                                                                                                                                                                
+G100 S2 KV apply {3683038670782709994 15 Get 4 }, shard                                                                                                                    
+2, index 16                                                                                                                                                                
+G100 S1 KV apply {3683038670782709994 16 Get 5 }, shard                                                                                                                    
+3, index 17                                                                                                                                                                
+G100 S1 KV notify index 17                                                                                                                                                 
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 6, shard 4, index 18                                                                                                                                        
+G100 S1 KV make chan for C18                                                                                                                                               
+G100 S2 KV apply {3683038670782709994 16 Get 5 }, shard                                                                                                                    
+3, index 17                                                                                                                                                                
+G100 S0 KV apply {3683038670782709994 16 Get 5 }, shard                                                                                                                    
+3, index 17                                                                                                                                                                
+G100 S1 KV apply {3683038670782709994 17 Get 6 }, shard                                                                                                                    
+4, index 18                                                                                                                                                                
+G100 S1 KV notify index 18                                                                                                                                                 
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 7, shard 5, index 19                                                                                                                                        
+G100 S1 KV make chan for C19                                                                                                                                               
+G100 S0 KV apply {3683038670782709994 17 Get 6 }, shard                                                                                                                    
+4, index 18                                                                                                                                                                
+G100 S2 KV apply {3683038670782709994 17 Get 6 }, shard                                                                                                                    
+4, index 18                                                                                                                                                                
+G100 S1 KV apply {3683038670782709994 18 Get 7 }, shard                                                                                                                    
+5, index 19                                                                                                                                                                
+G100 S1 KV notify index 19                                                                                                                                                 
+G100 S0 KV apply {3683038670782709994 18 Get 7 }, shard                                                                                                                    
+5, index 19                                                                                                                                                                
+G100 S2 KV apply {3683038670782709994 18 Get 7 }, shard                                                                                                                    
+5, index 19                                                                                                                                                                
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 8, shard 6, index 20                                                                                                                                        
+G100 S1 KV make chan for C20                                                                                                                                               
+G100 S1 KV apply {3683038670782709994 19 Get 8 }, shard                                                                                                                    
+6, index 20                                                                                                                                                                
+G100 S1 KV notify index 20                                                                                                                                                 
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 9, shard 7, index 21                                                                                                                                        
+G100 S1 KV make chan for C21                                                                                                                                               
+G100 S2 KV apply {3683038670782709994 19 Get 8 }, shard                                                                                                                    
+6, index 20                                                                                                                                                                
+G100 S0 KV apply {3683038670782709994 19 Get 8 }, shard                                                                                                                    
+6, index 20                                                                                                                                                                
+G100 S1 KV apply {3683038670782709994 20 Get 9 }, shard                                                                                                                    
+7, index 21                                                                                                                                                                
+G100 S1 KV notify index 21                                                                                                                                                 
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 0, shard 8, index 22                                                                                                                                        
+G100 S1 KV make chan for C22                                                                                                                                               
+G100 S1 KV apply {3683038670782709994 21 Get 0 }, shard                                                                                                                    
+8, index 22                                                                                                                                                                
+G100 S1 KV notify index 22                                                                                                                                                 
+G100 S0 KV apply {3683038670782709994 20 Get 9 }, shard                                                                                                                    
+7, index 21                                                                                                                                                                
+G100 S2 KV apply {3683038670782709994 20 Get 9 }, shard                                                                                                                    
+7, index 21                                                                                                                                                                
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 0, shard 8, index 23                                                                                                                                        
+G100 S1 KV make chan for C23                                                                                                                                               
+G100 S0 KV apply {3683038670782709994 21 Get 0 }, shard                                                                                                                    
+8, index 22                                                                                                                                                                
+G100 S2 KV apply {3683038670782709994 21 Get 0 }, shard                                                                                                                    
+8, index 22                                                                                                                                                                
+G100 S1 KV apply {3683038670782709994 22 Append 0 j18gL},                                                                                                                  
+shard 8, index 23                                                                                                                                                          
+G100 S1 KV notify index 23                                                                                                                                                 
+                                                                                                                   G102 S1 start config 2                                  
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 1, shard 9, index 24                                                                                                                                        
+G100 S1 KV make chan for C24                                                                                                                                               
+G100 S2 KV apply {3683038670782709994 22 Append 0 j18gL},                                                                                                                  
+shard 8, index 23                                                                                                                                                          
+G100 S0 KV apply {3683038670782709994 22 Append 0 j18gL},                                                                                                                  
+shard 8, index 23                                                                                                                                                          
+G100 S1 KV apply {3683038670782709994 23 Get 1 }, shard                                                                                                                    
+9, index 24                                                                                                                                                                
+G100 S1 KV notify index 24                                                                                                                                                 
+                                                                                                                   G102 S1 Update Config to 2, need map[], out []          
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 1, shard 9, index 25                                                                                                                                        
+G100 S1 KV make chan for C25                                                                                                                                               
+G100 S0 KV apply {3683038670782709994 23 Get 1 }, shard                                                                                                                    
+9, index 24                                                                                                                                                                
+G100 S2 KV apply {3683038670782709994 23 Get 1 }, shard                                                                                                                    
+9, index 24                                                                                                                                                                
+G100 S1 KV apply {3683038670782709994 24 Append 1 w-lzk},                                                                                                                  
+shard 9, index 25                                                                                                                                                          
+G100 S1 KV notify index 25                                                                                                                                                 
+G100 S0 KV Not Leader                                                                                                                                                      
+                                                          G101 S0 start config 2                                                                                           
+G100 S1 KV Get 2, shard 0, index 26                                                                                                                                        
+G100 S1 KV make chan for C26                                                                                                                                               
+G100 S1 start config 2                                                                                                                                                     
+G100 S2 KV apply {3683038670782709994 24 Append 1 w-lzk},                                                                                                                  
+shard 9, index 25                                                                                                                                                          
+G100 S0 KV apply {3683038670782709994 24 Append 1 w-lzk},                                                                                                                  
+shard 9, index 25                                                                                                                                                          
+                                                          G101 S0 Update Config to 2, need map[5:1 6:1 7:1 8:1                                                             
+                                                          9:1], out []                                                                                                     
+G100 S1 KV apply {3683038670782709994 25 Get 2 }, shard                                                                                                                    
+0, index 26                                                                                                                                                                
+G100 S1 KV notify index 26                                                                                                                                                 
+G100 S1 Update Config to 2, need map[], out [5 6 7 8 9]                                                                                                                    
+G100 S1 Save table Config 2, map[7:auY-G]                                                                                                                                  
+G100 S1 Save table Config 2, map[8:1m1xT]                                                                                                                                  
+G100 S1 Save table Config 2, map[9:Tm07V]                                                                                                                                  
+G100 S1 Save table Config 2, map[0:LsLZ-j18gL]                                                                                                                             
+G100 S1 Save table Config 2, map[1:Twovqw-lzk]                                                                                                                             
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 2, shard 0, index 28                                                                                                                                        
+G100 S1 KV make chan for C28                                                                                                                                               
+G100 S2 KV apply {3683038670782709994 25 Get 2 }, shard                                                                                                                    
+0, index 26                                                                                                                                                                
+G100 S2 Update Config to 2, need map[], out [5 6 7 8 9]                                                                                                                    
+G100 S2 Save table Config 2, map[7:auY-G]                                                                                                                                  
+G100 S2 Save table Config 2, map[8:1m1xT]                                                                                                                                  
+G100 S0 KV apply {3683038670782709994 25 Get 2 }, shard                                                                                                                    
+0, index 26                                                                                                                                                                
+G100 S0 Update Config to 2, need map[], out [5 6 7 8 9]                                                                                                                    
+G100 S0 Save table Config 2, map[7:auY-G]                                                                                                                                  
+G100 S2 Save table Config 2, map[9:Tm07V]                                                                                                                                  
+G100 S2 Save table Config 2, map[0:LsLZ-j18gL]                                                                                                                             
+G100 S2 Save table Config 2, map[1:Twovqw-lzk]                                                                                                                             
+G100 S0 Save table Config 2, map[8:1m1xT]                                                                                                                                  
+G100 S0 Save table Config 2, map[9:Tm07V]                                                                                                                                  
+G100 S0 Save table Config 2, map[0:LsLZ-j18gL]                                                                                                                             
+G100 S0 Save table Config 2, map[1:Twovqw-lzk]                                                                                                                             
+G100 S1 KV apply {3683038670782709994 26 Append 2 j22_U},                                                                                                                  
+shard 0, index 28                                                                                                                                                          
+G100 S1 KV notify index 28                                                                                                                                                 
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 3, shard 1, index 29                                                                                                                                        
+G100 S1 KV make chan for C29                                                                                                                                               
+G100 S0 KV apply {3683038670782709994 26 Append 2 j22_U},                                                                                                                  
+shard 0, index 28                                                                                                                                                          
+                                                          G101 S0 KV start pull shards 6, cfg 1                                                                            
+G100 S2 KV apply {3683038670782709994 26 Append 2 j22_U},                                                                                                                  
+shard 0, index 28                                                                                                                                                          
+G100 S1 KV apply {3683038670782709994 27 Get 3 }, shard                                                                                                                    
+1, index 29                                                                                                                                                                
+G100 S1 KV notify index 29                                                                                                                                                 
+                                                          G101 S1 Update Config to 2, need map[5:1 6:1 7:1 8:1                                                             
+                                                          9:1], out []                                                                                                     
+                                                          G101 S0 KV start pull shards 7, cfg 1                                                                            
+G100 S0 KV Not Leader                                                                                                                                                      
+                                                          G101 S2 Update Config to 2, need map[5:1 6:1 7:1 8:1                                                             
+                                                          9:1], out []                                                                                                     
+G100 S1 KV Get 3, shard 1, index 30                                                                                                                                        
+G100 S1 KV make chan for C30                                                                                                                                               
+G100 S1 KV reply table maxreq                                                                                                                                              
+                                                          G101 S0 KV pull shards succ 6, cfg 1, table map[8:1m1xT]                                                         
+G100 S2 KV apply {3683038670782709994 27 Get 3 }, shard                                                                                                                    
+1, index 29                                                                                                                                                                
+G100 S0 KV apply {3683038670782709994 27 Get 3 }, shard                                                                                                                    
+1, index 29                                                                                                                                                                
+G100 S1 KV apply {3683038670782709994 28 Append 3 j-k_a},                                                                                                                  
+shard 1, index 30                                                                                                                                                          
+G100 S1 KV notify index 30                                                                                                                                                 
+                                                          G101 S0 KV start pull shards 8, cfg 1                                                                            
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 4, shard 2, index 31                                                                                                                                        
+G100 S1 KV reply table maxreq                                                                                                                                              
+G100 S1 KV make chan for C31                                                                                                                                               
+                                                          G101 S0 KV pull shards succ 7, cfg 1, table map[9:Tm07V]                                                         
+G100 S0 KV apply {3683038670782709994 28 Append 3 j-k_a},                                                                                                                  
+shard 1, index 30                                                                                                                                                          
+G100 S2 KV apply {3683038670782709994 28 Append 3 j-k_a},                                                                                                                  
+shard 1, index 30                                                                                                                                                          
+G100 S1 KV apply {3683038670782709994 29 Get 4 }, shard                                                                                                                    
+2, index 31                                                                                                                                                                
+                                                          G101 S0 KV start pull shards 9, cfg 1                                                                            
+G100 S1 KV notify index 31                                                                                                                                                 
+G100 S1 KV reply table maxreq                                                                                                                                              
+G100 S0 KV Not Leader                                                                                                                                                      
+                                                          G101 S0 KV pull shards succ 8, cfg 1, table                                                                      
+                                                          map[0:LsLZ-j18gL]                                                                                                
+G100 S1 KV Get 4, shard 2, index 32                                                                                                                                        
+G100 S1 KV make chan for C32                                                                                                                                               
+G100 S0 KV apply {3683038670782709994 29 Get 4 }, shard                                                                                                                    
+2, index 31                                                                                                                                                                
+G100 S2 KV apply {3683038670782709994 29 Get 4 }, shard                                                                                                                    
+2, index 31                                                                                                                                                                
+                                                                                                                   G102 S0 Update Config to 2, need map[], out []          
+G100 S1 KV apply {3683038670782709994 30 Append 4 o1IAs},                                                                                                                  
+shard 2, index 32                                                                                                                                                          
+G100 S1 KV notify index 32                                                                                                                                                 
+G100 S2 KV apply {3683038670782709994 30 Append 4 o1IAs},                                                                                                                  
+shard 2, index 32                                                                                                                                                          
+G100 S0 KV apply {3683038670782709994 30 Append 4 o1IAs},                                                                                                                  
+shard 2, index 32                                                                                                                                                          
+                                                                                                                   G102 S2 Update Config to 2, need map[], out []          
+G100 S0 KV Not Leader                                                                                                                                                      
+                                                          G101 S0 KV start pull shards 5, cfg 1                                                                            
+G100 S1 KV Get 5, shard 3, index 33                                                                                                                                        
+G100 S1 KV make chan for C33                                                                                                                                               
+G100 S1 KV reply table maxreq                                                                                                                                              
+                                                          G101 S0 KV pull shards succ 9, cfg 1, table                                                                      
+                                                          map[1:Twovqw-lzk]                                                                                                
+G100 S1 KV apply {3683038670782709994 31 Get 5 }, shard                                                                                                                    
+3, index 33                                                                                                                                                                
+G100 S1 KV notify index 33                                                                                                                                                 
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV reply table maxreq                                                                                                                                              
+G100 S1 KV Get 5, shard 3, index 34                                                                                                                                        
+G100 S1 KV make chan for C34                                                                                                                                               
+                                                          G101 S0 KV pull shards succ 5, cfg 1, table map[7:auY-G]                                                         
+                                                          G101 S0 KV pull all succ                                                                                         
+G100 S2 KV apply {3683038670782709994 31 Get 5 }, shard                                                                                                                    
+3, index 33                                                                                                                                                                
+G100 S0 KV apply {3683038670782709994 31 Get 5 }, shard                                                                                                                    
+3, index 33                                                                                                                                                                
+G100 S1 KV apply {3683038670782709994 32 Append 5 12ne6},                                                                                                                  
+shard 3, index 34                                                                                                                                                          
+G100 S1 KV notify index 34                                                                                                                                                 
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 6, shard 4, index 35                                                                                                                                        
+G100 S1 KV make chan for C35                                                                                                                                               
+G100 S0 KV apply {3683038670782709994 32 Append 5 12ne6},                                                                                                                  
+shard 3, index 34                                                                                                                                                          
+G100 S2 KV apply {3683038670782709994 32 Append 5 12ne6},                                                                                                                  
+shard 3, index 34                                                                                                                                                          
+G100 S1 KV apply {3683038670782709994 33 Get 6 }, shard                                                                                                                    
+4, index 35                                                                                                                                                                
+G100 S1 KV notify index 35                                                                                                                                                 
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 6, shard 4, index 36                                                                                                                                        
+G100 S1 KV make chan for C36                                                                                                                                               
+G100 S0 KV apply {3683038670782709994 33 Get 6 }, shard                                                                                                                    
+4, index 35                                                                                                                                                                
+G100 S2 KV apply {3683038670782709994 33 Get 6 }, shard                                                                                                                    
+4, index 35                                                                                                                                                                
+G100 S1 KV apply {3683038670782709994 34 Append 6 ZVyNN},                                                                                                                  
+shard 4, index 36                                                                                                                                                          
+G100 S1 KV notify index 36                                                                                                                                                 
+G100 S0 KV Not Leader                                                                                                                                                      
+G100 S1 KV Get 7, shard 5, index 37                                                                                                                                        
+G100 S1 KV make chan for C37                                                                                                                                               
+G100 S2 KV apply {3683038670782709994 34 Append 6 ZVyNN},                                                                                                                  
+shard 4, index 36                                                                                                                                                          
+G100 S0 KV apply {3683038670782709994 34 Append 6 ZVyNN},                                                                                                                  
+shard 4, index 36                                                                                                                                                          
+G100 S0 KV WrongGroup, 7 shard 5, acc                                                                                                                                      
+G100 S2 KV WrongGroup, 7 shard 5, acc                                                                                                                                      
+G100 S1 KV WrongGroup, 7 shard 5, acc                                                                                                                                      
+G100 S1 KV notify index 37                                                                                                                                                 
+                                                          G101 S0 KV Get 7, shard 5, index 8                                                                               
+                                                          G101 S0 KV make chan for C8                                                                                      
+                                                          G101 S0 KV apply {3683038670782709994 35 Get 7 }, shard                                                          
+                                                          5, index 8                                                                                                       
+                                                          G101 S0 KV notify index 8                                                                                        
+                                                          G101 S0 KV Get 7, shard 5, index 9                                                                               
+                                                          G101 S0 KV make chan for C9                                                                                      
+                                                          G101 S2 KV apply {3683038670782709994 35 Get 7 }, shard                                                          
+                                                          5, index 8                                                                                                       
+                                                          G101 S1 KV apply {3683038670782709994 35 Get 7 }, shard                                                          
+                                                          5, index 8                                                                                                       
+                                                          G101 S0 KV apply {3683038670782709994 36 Append 7                                                                
+                                                          asQTB}, shard 5, index 9                                                                                         
+                                                          G101 S0 KV notify index 9                                                                                        
+                                                          G101 S0 KV Get 8, shard 6, index 10                                                                              
+                                                          G101 S0 KV make chan for C10                                                                                     
+                                                          G101 S2 KV apply {3683038670782709994 36 Append 7                                                                
+                                                          asQTB}, shard 5, index 9                                                                                         
+                                                          G101 S1 KV apply {3683038670782709994 36 Append 7                                                                
+                                                          asQTB}, shard 5, index 9                                                                                         
+                                                          G101 S1 KV apply {3683038670782709994 37 Get 8 }, shard                                                          
+                                                          6, index 10                                                                                                      
+                                                          G101 S2 KV apply {3683038670782709994 37 Get 8 }, shard                                                          
+                                                          6, index 10                                                                                                      
+                                                          G101 S0 KV apply {3683038670782709994 37 Get 8 }, shard                                                          
+                                                          6, index 10                                                                                                      
+                                                          G101 S0 KV notify index 10                                                                                       
+                                                          G101 S0 KV Get 8, shard 6, index 11                                                                              
+                                                          G101 S0 KV make chan for C11                                                                                     
+                                                          G101 S0 KV apply {3683038670782709994 38 Append 8                                                                
+                                                          VGIEu}, shard 6, index 11                                                                                        
+                                                          G101 S0 KV notify index 11                                                                                       
+                                                          G101 S0 KV Get 9, shard 7, index 12                                                                              
+                                                          G101 S0 KV make chan for C12                                                                                     
+                                                          G101 S1 KV apply {3683038670782709994 38 Append 8                                                                
+                                                          VGIEu}, shard 6, index 11                                                                                        
+                                                          G101 S2 KV apply {3683038670782709994 38 Append 8                                                                
+                                                          VGIEu}, shard 6, index 11                                                                                        
+                                                          G101 S0 KV apply {3683038670782709994 39 Get 9 }, shard                                                          
+                                                          7, index 12                                                                                                      
+                                                          G101 S0 KV notify index 12                                                                                       
+                                                          G101 S0 KV Get 9, shard 7, index 13                                                                              
+                                                          G101 S0 KV make chan for C13                                                                                     
+                                                          G101 S2 KV apply {3683038670782709994 39 Get 9 }, shard                                                          
+                                                          7, index 12                                                                                                      
+                                                          G101 S1 KV apply {3683038670782709994 39 Get 9 }, shard                                                          
+                                                          7, index 12                                                                                                      
+                                                          G101 S0 KV apply {3683038670782709994 40 Append 9                                                                
+                                                          mtjLK}, shard 7, index 13                                                                                        
+                                                          G101 S0 KV notify index 13                                                                                       
+                                                          G101 S0 KV Get 0, shard 8, index 14                                                                              
+                                                          G101 S0 KV make chan for C14                                                                                     
+                                                          G101 S1 KV apply {3683038670782709994 40 Append 9                                                                
+                                                          mtjLK}, shard 7, index 13                                                                                        
+                                                          G101 S2 KV apply {3683038670782709994 40 Append 9                                                                
+                                                          mtjLK}, shard 7, index 13                                                                                        
+                                                          G101 S0 KV apply {3683038670782709994 41 Get 0 }, shard                                                          
+                                                          8, index 14                                                                                                      
+                                                          G101 S0 KV notify index 14                                                                                       
+                                                          G101 S0 start config 3                                                                                           
+                                                          G101 S0 KV Get 0, shard 8, index 16                                                                              
+                                                          G101 S0 KV make chan for C16                                                                                     
+                                                          G101 S1 KV apply {3683038670782709994 41 Get 0 }, shard                                                          
+                                                          8, index 14                                                                                                      
+                                                          G101 S2 KV apply {3683038670782709994 41 Get 0 }, shard                                                          
+                                                          8, index 14                                                                                                      
+                                                          G101 S1 Update Config to 3, need map[0:2 1:2 2:2 3:2                                                             
+                                                          4:2], out []                                                                                                     
+                                                          G101 S1 KV apply {3683038670782709994 42 Append 0                                                                
+                                                          HPtFa}, shard 8, index 16                                                                                        
+                                                          G101 S2 Update Config to 3, need map[0:2 1:2 2:2 3:2                                                             
+                                                          4:2], out []                                                                                                     
+                                                          G101 S2 KV apply {3683038670782709994 42 Append 0                                                                
+                                                          HPtFa}, shard 8, index 16                                                                                        
+                                                          G101 S0 Update Config to 3, need map[0:2 1:2 2:2 3:2                                                             
+                                                          4:2], out []                                                                                                     
+                                                          G101 S0 KV apply {3683038670782709994 42 Append 0                                                                
+                                                          HPtFa}, shard 8, index 16                                                                                        
+                                                          G101 S0 KV notify index 16                                                                                       
+                                                          G101 S0 KV Get 1, shard 9, index 17                                                                              
+                                                          G101 S0 KV make chan for C17                                                                                     
+                                                          G101 S0 KV start pull shards 1, cfg 2                                                                            
+                                                                                                                   G102 S1 start config 3                                  
+                                                                                                                   G102 S1 Update Config to 3, need map[], out []          
+                                                          G101 S0 KV start pull shards 2, cfg 2                                                                            
+G100 S1 KV reply table maxreq                                                                                                                                              
+                                                          G101 S0 KV pull shards succ 1, cfg 2, table map[]                                                                
+                                                          G101 S%!d(shardkv.Err=) KV Get reply err %!v(MISSING)                                                            
+                                                          G101 S1 KV Not Leader                                                                                            
+                                                          G101 S2 KV Not Leader                                                                                            
+                                                          G101 S2 KV apply {3683038670782709994 43 Get 1 }, shard                                                          
+                                                          9, index 17                                                                                                      
+                                                          G101 S1 KV apply {3683038670782709994 43 Get 1 }, shard                                                          
+                                                          9, index 17                                                                                                      
+                                                                                                                   G102 S0 Update Config to 3, need map[], out []          
+                                                                                                                   G102 S2 Update Config to 3, need map[], out []          
+                                                          G101 S0 KV start pull shards 3, cfg 2                                                                            
+G100 S1 KV reply table maxreq                                                                                                                                              
+                                                          G101 S0 KV pull shards succ 2, cfg 2, table map[]                                                                
+G100 S1 start config 3                                                                                                                                                     
+                                                          G101 S0 KV start pull shards 4, cfg 2                                                                            
+G100 S1 KV reply table maxreq                                                                                                                                              
+                                                          G101 S0 KV pull shards succ 3, cfg 2, table map[]                                                                
+                                                          G101 S0 KV start pull shards 0, cfg 2                                                                            
+G100 S1 KV reply table maxreq                                                                                                                                              
+                                                          G101 S0 KV pull shards succ 4, cfg 2, table map[]                                                                
+G100 S1 Update Config to 3, need map[], out [0 1 2 3 4]                                                                                                                    
+G100 S1 Save table Config 3, map[2:RYZfrj22_U]                                                                                                                             
+G100 S1 Save table Config 3, map[3:l9WOyj-k_a]                                                                                                                             
+G100 S1 Save table Config 3, map[4:ZWnJco1IAs]                                                                                                                             
+G100 S1 Save table Config 3, map[5:FHNIx12ne6]                                                                                                                             
+G100 S1 Save table Config 3, map[6:ArDSOZVyNN]                                                                                                                             
+                                                          G101 S0 KV apply {3683038670782709994 43 Get 1 }, shard                                                          
+                                                          9, index 17                                                                                                      
+                                                          G101 S0 KV notify index 17                                                                                       
+G100 S1 KV reply table maxreq                                                                                                                                              
+                                                          G101 S0 KV pull shards succ 0, cfg 2, table                                                                      
+                                                          map[2:RYZfrj22_U]                                                                                                
+                                                          G101 S0 KV pull all succ                                                                                         
+G100 S0 Update Config to 3, need map[], out [0 1 2 3 4]                                                                                                                    
+G100 S0 Save table Config 3, map[2:RYZfrj22_U]                                                                                                                             
+G100 S0 Save table Config 3, map[3:l9WOyj-k_a]                                                                                                                             
+G100 S0 Save table Config 3, map[4:ZWnJco1IAs]                                                                                                                             
+G100 S0 Save table Config 3, map[5:FHNIx12ne6]                                                                                                                             
+G100 S0 Save table Config 3, map[6:ArDSOZVyNN]                                                                                                                             
+G100 S2 Update Config to 3, need map[], out [0 1 2 3 4]                                                                                                                    
+G100 S2 Save table Config 3, map[2:RYZfrj22_U]                                                                                                                             
+G100 S2 Save table Config 3, map[3:l9WOyj-k_a]                                                                                                                             
+G100 S2 Save table Config 3, map[4:ZWnJco1IAs]                                                                                                                             
+G100 S2 Save table Config 3, map[5:FHNIx12ne6]                                                                                                                             
+G100 S2 Save table Config 3, map[6:ArDSOZVyNN]                                                                                                                             
+                                                          G101 S0 KV Get 1, shard 9, index 23                                                                              
+                                                          G101 S0 KV make chan for C23                                                                                     
+                                                          G101 S0 KV apply {3683038670782709994 43 Get 1 }, shard                                                          
+                                                          9, index 23                                                                                                      
+                                                          G101 S0 KV notify index 23                                                                                       
+                                                          G101 S0 KV Get 1, shard 9, index 24                                                                              
+                                                          G101 S0 KV make chan for C24                                                                                     
+                                                          G101 S2 KV apply {3683038670782709994 43 Get 1 }, shard                                                          
+                                                          9, index 23                                                                                                      
+                                                          G101 S1 KV apply {3683038670782709994 43 Get 1 }, shard                                                          
+                                                          9, index 23                                                                                                      
+                                                          G101 S0 KV apply {3683038670782709994 44 Append 1                                                                
+                                                          yn0ht}, shard 9, index 24                                                                                        
+                                                          G101 S0 KV notify index 24                                                                                       
+                                                          G101 S0 KV Get 2, shard 0, index 25                                                                              
+                                                          G101 S0 KV make chan for C25                                                                                     
+                                                          G101 S2 KV apply {3683038670782709994 44 Append 1                                                                
+                                                          yn0ht}, shard 9, index 24                                                                                        
+                                                          G101 S1 KV apply {3683038670782709994 44 Append 1                                                                
+                                                          yn0ht}, shard 9, index 24                                                                                        
+                                                          G101 S0 KV apply {3683038670782709994 45 Get 2 }, shard                                                          
+                                                          0, index 25                                                                                                      
+                                                          G101 S0 KV notify index 25                                                                                       
+                                                          G101 S0 KV Get 2, shard 0, index 26                                                                              
+                                                          G101 S0 KV make chan for C26                                                                                     
+                                                          G101 S1 KV apply {3683038670782709994 45 Get 2 }, shard                                                          
+                                                          0, index 25                                                                                                      
+                                                          G101 S2 KV apply {3683038670782709994 45 Get 2 }, shard                                                          
+                                                          0, index 25                                                                                                      
+                                                          G101 S0 KV apply {3683038670782709994 46 Append 2                                                                
+                                                          ObrKq}, shard 0, index 26                                                                                        
+                                                          G101 S0 KV notify index 26                                                                                       
+                                                          G101 S0 KV Get 3, shard 1, index 27                                                                              
+                                                          G101 S0 KV make chan for C27                                                                                     
+                                                          G101 S2 KV apply {3683038670782709994 46 Append 2                                                                
+                                                          ObrKq}, shard 0, index 26                                                                                        
+                                                          G101 S1 KV apply {3683038670782709994 46 Append 2                                                                
+                                                          ObrKq}, shard 0, index 26                                                                                        
+                                                          G101 S0 KV apply {3683038670782709994 47 Get 3 }, shard                                                          
+                                                          1, index 27                                                                                                      
+                                                          G101 S0 KV notify index 27                                                                                       
+###########################################################################################################################################################################
+        l9WOyj-k_a
+###########################################################################################################################################################################
+        received:
+###########################################################################################################################################################################
+FAIL
+###########################################################################################################################################################################
+FAIL    6.824/shardkv   2.168s
