@@ -11,11 +11,9 @@ func (kv *ShardKV) WatchConfig() {
 	for !kv.killed() {
 		config := kv.mck.Query(-1)
 		kv.mu.Lock()
-		if _, isLeader := kv.rf.GetState(); isLeader && len(kv.InShard) == 0 {
-			if config.Num != kv.cfg.Num {
-				DebugLog(dKVraft, "G%d S%d start config %d", kv.gid, kv.me, config.Num)
-				kv.rf.Start(config)
-			}
+		if _, isLeader := kv.rf.GetState(); isLeader && len(kv.InShard) == 0 && kv.cfg.Num < config.Num {
+			DebugLog(dKVraft, "G%d S%d start config %d", kv.gid, kv.me, config.Num)
+			kv.rf.Start(config)
 		}
 		kv.mu.Unlock()
 		time.Sleep(100 * time.Millisecond)
