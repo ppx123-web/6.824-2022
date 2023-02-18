@@ -9,8 +9,8 @@ import (
 
 func (kv *ShardKV) WatchConfig() {
 	for !kv.killed() {
-		config := kv.mck.Query(kv.cfg.Num + 1)
 		kv.mu.Lock()
+		config := kv.mck.Query(kv.cfg.Num + 1)
 		if _, isLeader := kv.rf.GetState(); isLeader && len(kv.InShard) == 0 && kv.cfg.Num < config.Num {
 			DebugLog(dKVraft, "G%d S%d start config %d", kv.gid, kv.me, config.Num)
 			kv.rf.Start(config)
@@ -55,6 +55,7 @@ func (kv *ShardKV) ShardMigration(args *ShardTransferArg, reply *ShardTransferRe
 	reply.Succ = true
 	reply.Err = OK
 	reply.Shard = args.Shard
+	reply.CfgN = args.ConfigN
 	DebugLog(dKVraft, "G%d S%d KV reply table maxreq", kv.gid, kv.me)
 }
 

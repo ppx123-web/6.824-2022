@@ -18,7 +18,7 @@ package shardctrler
 //
 
 // The number of shards.
-const NShards = 10
+const NShards int = 10
 
 // A configuration -- an assignment of shards to groups.
 // Please don't change this.

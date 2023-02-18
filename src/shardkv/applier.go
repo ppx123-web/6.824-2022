@@ -60,7 +60,7 @@ func (kv *ShardKV) DataOperation(cmd raft.ApplyMsg) {
 				} else {
 					kv.table[op.Key] = op.Value
 				}
-				DebugLog(dKVraft, "G%d S%d KV apply %v, shard %d, index %d", kv.gid, kv.me, op, shard, cmd.CommandIndex)
+				DebugLog(dKVraft, "G%d S%d KV apply %v, shard %d, index %d, get %v", kv.gid, kv.me, op, shard, cmd.CommandIndex, kv.table[op.Key])
 			}
 		default:
 			log.Fatal("Error cmd")
@@ -114,12 +114,16 @@ func (kv *ShardKV) UpdateConfig(cfg shardctrler.Config) {
 				}
 			}
 			kv.ShardDB[prevcfg.Num][shard] = t
-			DebugLog(dKVraft, "G%d S%d Save table Config %d, %v", kv.gid, kv.me, kv.cfg.Num, t)
+			DebugLog(dKVraft, "G%d S%d Save table Config %d, %v", kv.gid, kv.me, prevcfg.Num, t)
 		}
 	}
 }
 
-func (kv *ShardKV) UpdateShards(shard int, table map[string]string, maxreq map[int]int) {
+func (kv *ShardKV) UpdateShards(shard, cfgN int, table map[string]string, maxreq map[int]int) {
+	if cfgN != kv.cfg.Num-1 || kv.Respon[shard] {
+		return
+	}
+	delete(kv.InShard, shard)
 	for k, v := range table {
 		kv.table[k] = v
 	}
@@ -127,10 +131,9 @@ func (kv *ShardKV) UpdateShards(shard int, table map[string]string, maxreq map[i
 		if v > kv.Maxreq[k] {
 			kv.Maxreq[k] = v
 		}
-
 	}
 	kv.Respon[shard] = true
-	delete(kv.InShard, shard)
+	DebugLog(dKVraft, "G%d S%d update cfg %d shards %d to %v", kv.gid, kv.me, cfgN, shard, table)
 }
 
 func (kv *ShardKV) applier() {
@@ -143,7 +146,7 @@ func (kv *ShardKV) applier() {
 			} else if cfg, ok := cmd.Command.(shardctrler.Config); ok {
 				kv.UpdateConfig(cfg)
 			} else if reply, ok := cmd.Command.(ShardTransferReply); ok {
-				kv.UpdateShards(reply.Shard, reply.Table, reply.Maxreq)
+				kv.UpdateShards(reply.Shard, reply.CfgN, reply.Table, reply.Maxreq)
 			}
 			if kv.CheckSnapshot() {
 				kv.rf.Snapshot(kv.lastApplied, kv.CreateSnapshot())

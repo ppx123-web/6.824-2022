@@ -103,6 +103,11 @@ func (sc *ShardCtrler) Balance(c *Config) {
 			count[gid] = append(count[gid], left[:length]...)
 			left = left[length:]
 		}
+		if len(count[gid]) == avg && overCnt > 0 {
+			count[gid] = append(count[gid], left[0])
+			left = left[1:]
+			overCnt--
+		}
 	}
 
 	for gid, shards := range count {

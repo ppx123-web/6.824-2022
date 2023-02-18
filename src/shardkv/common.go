@@ -62,4 +62,5 @@ type ShardTransferReply struct {
 	Table  map[string]string
 	Maxreq map[int]int
 	Shard  int
+	CfgN   int
 }

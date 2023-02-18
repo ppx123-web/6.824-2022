@@ -51,8 +51,6 @@ type ShardKV struct {
 	ShardDB     map[int]map[int]map[string]string // config -> shard -> table
 	Respon      [shardctrler.NShards]bool         // offer service for shard
 	InShard     map[int]int                       // shard -> cfg.Num
-	UpdateCh    chan bool
-	CanPullCfg  bool
 }
 
 func (kv *ShardKV) CheckShardsGid(key string) bool {
@@ -146,6 +144,8 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 // turn off debug output from this instance.
 func (kv *ShardKV) Kill() {
 	kv.rf.Kill()
+	// atomic.StoreInt32(&kv.dead, 1)
+	DebugLog(dInfo, "G%d S%d killed", kv.gid, kv.me)
 	// Your code here, if desired.
 }
 
@@ -226,8 +226,8 @@ func StartServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister,
 	kv.cfg = shardctrler.Config{}
 	kv.ShardDB = make(map[int]map[int]map[string]string)
 	kv.InShard = make(map[int]int)
-	kv.UpdateCh = make(chan bool)
-	kv.CanPullCfg = true
+
+	DebugLog(dInfo, "G%d S%d start", kv.gid, kv.me)
 
 	go kv.WatchConfig()
 	go kv.applier()
