@@ -74,7 +74,7 @@ func (kv *ShardKV) pullShards() {
 						Shard:   shard,
 					}, &cfg)
 					kv.rf.Start(reply)
-					DebugLog(dKVraft, "G%d S%d KV pull shards succ %d, cfg %d, table %v", kv.gid, kv.me, shard, cfgN, reply.Table)
+					DebugLog(dKVraft, "G%d S%d KV pull shards succ %d, cfg %d, table %v", kv.gid, kv.me, reply.Shard, reply.CfgN, reply.Table)
 				}(shard, kv.mck.Query(cfgN))
 			}
 			kv.mu.Unlock()
@@ -85,4 +85,74 @@ func (kv *ShardKV) pullShards() {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
+}
+
+func (kv *ShardKV) garbageCollection() {
+	for !kv.killed() {
+		if _, isLeader := kv.rf.GetState(); isLeader {
+			kv.mu.Lock()
+			var wait sync.WaitGroup
+			for args := range kv.NoNeed {
+				wait.Add(1)
+				go func(args DeleteArgs) {
+					defer wait.Done()
+					if servers, ok := kv.cfg.Groups[kv.mck.Query(args.CfgN).Shards[args.Shard]]; ok {
+						for si := 0; si < len(servers); si++ {
+							srv := kv.make_end(servers[si])
+							var reply ShardTransferReply
+							ok := srv.Call("ShardKV.CanDelete", &args, &reply)
+							if ok && reply.Succ && reply.Err == OK {
+								kv.mu.Lock()
+								delete(kv.NoNeed, args)
+								kv.mu.Unlock()
+							}
+						}
+					}
+				}(args)
+			}
+
+			// for cfgN, m := range kv.ShardDB {
+			// 	for shard := range m {
+			// 		wait.Add(1)
+			// 		go func(args DeleteArgs) {
+			// 			defer wait.Done()
+			// 			if servers, ok := kv.cfg.Groups[kv.mck.Query(args.CfgN).Shards[args.Shard]]; ok {
+			// 				for si := 0; si < len(servers); si++ {
+			// 					srv := kv.make_end(servers[si])
+			// 					var reply ShardTransferReply
+			// 					ok := srv.Call("ShardKV.CanDelete", &args, &reply)
+			// 					if ok && reply.Succ && reply.Err == OK {
+			// 						kv.rf.Start(args)
+			// 					}
+			// 				}
+			// 			}
+			// 		}(DeleteArgs{
+			// 			CfgN:  cfgN,
+			// 			Shard: shard,
+			// 		})
+			// 	}
+			// }
+			kv.mu.Unlock()
+			wait.Wait()
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func (kv *ShardKV) CanDelete(args *DeleteArgs, reply *DeleteReply) {
+	index, _, isLeader := kv.rf.Start(*args)
+	reply.Err = ErrWrongLeader
+	reply.Succ = false
+	if isLeader {
+		ch := kv.CheckInform(index, -1, -1)
+		info := <-ch
+		reply.Err = Err(info.Err)
+		kv.mu.Lock()
+		close(ch)
+		delete(kv.Inform, index)
+		kv.mu.Unlock()
+		reply.Err = OK
+		reply.Succ = true
+	}
+
 }

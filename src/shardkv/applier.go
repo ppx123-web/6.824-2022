@@ -22,11 +22,6 @@ func (kv *ShardKV) CheckClerkOpDuplicate(Clerk, Seq int) bool {
 
 func (kv *ShardKV) DataOperation(cmd raft.ApplyMsg) {
 	op := cmd.Command.(Op)
-	if cmd.CommandIndex <= kv.lastApplied {
-		DebugLog(dKVraft, "G%d S%d KV index %d duplicate", kv.gid, kv.me, cmd.CommandIndex)
-		return
-	}
-	kv.lastApplied = cmd.CommandIndex
 	var info = informCh{
 		Cmd:     op.Cmd,
 		ClerkId: op.ClerkId,
@@ -134,6 +129,22 @@ func (kv *ShardKV) UpdateShards(shard, cfgN int, table map[string]string, maxreq
 	}
 	kv.Respon[shard] = true
 	DebugLog(dKVraft, "G%d S%d update cfg %d shards %d to %v", kv.gid, kv.me, cfgN, shard, table)
+	kv.NoNeed[DeleteArgs{CfgN: cfgN, Shard: shard}] = true
+}
+
+func (kv *ShardKV) DeleteDB(cfgN, shard, index int) {
+	delete(kv.ShardDB[cfgN], shard)
+	if len(kv.ShardDB[cfgN]) == 0 {
+		delete(kv.ShardDB, cfgN)
+	}
+	_, isLeader := kv.rf.GetState()
+	ch, ok := kv.Inform[index]
+	if ok && isLeader {
+		DebugLog(dKVraft, "G%d S%d KV notify index %d", kv.gid, kv.me, index)
+		ch <- informCh{
+			Err: OK,
+		}
+	}
 }
 
 func (kv *ShardKV) applier() {
@@ -141,12 +152,19 @@ func (kv *ShardKV) applier() {
 		cmd := <-kv.applyCh
 		if cmd.CommandValid {
 			kv.mu.Lock()
+			if cmd.CommandIndex <= kv.lastApplied {
+				DebugLog(dKVraft, "G%d S%d KV index %d duplicate", kv.gid, kv.me, cmd.CommandIndex)
+				return
+			}
+			kv.lastApplied = cmd.CommandIndex
 			if _, ok := cmd.Command.(Op); ok {
 				kv.DataOperation(cmd)
 			} else if cfg, ok := cmd.Command.(shardctrler.Config); ok {
 				kv.UpdateConfig(cfg)
 			} else if reply, ok := cmd.Command.(ShardTransferReply); ok {
 				kv.UpdateShards(reply.Shard, reply.CfgN, reply.Table, reply.Maxreq)
+			} else if reply, ok := cmd.Command.(DeleteArgs); ok {
+				kv.DeleteDB(reply.CfgN, reply.Shard, cmd.CommandIndex)
 			}
 			if kv.CheckSnapshot() {
 				kv.rf.Snapshot(kv.lastApplied, kv.CreateSnapshot())

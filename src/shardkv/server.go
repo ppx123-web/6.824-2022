@@ -51,6 +51,7 @@ type ShardKV struct {
 	ShardDB     map[int]map[int]map[string]string // config -> shard -> table
 	Respon      [shardctrler.NShards]bool         // offer service for shard
 	InShard     map[int]int                       // shard -> cfg.Num
+	NoNeed      map[DeleteArgs]bool
 }
 
 func (kv *ShardKV) CheckShardsGid(key string) bool {
@@ -202,6 +203,7 @@ func StartServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister,
 	labgob.Register(Op{})
 	labgob.Register(shardctrler.Config{})
 	labgob.Register(ShardTransferReply{})
+	labgob.Register(DeleteArgs{})
 
 	kv := new(ShardKV)
 	kv.me = me
@@ -226,12 +228,14 @@ func StartServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister,
 	kv.cfg = shardctrler.Config{}
 	kv.ShardDB = make(map[int]map[int]map[string]string)
 	kv.InShard = make(map[int]int)
+	kv.NoNeed = make(map[DeleteArgs]bool)
 
 	DebugLog(dInfo, "G%d S%d start", kv.gid, kv.me)
 
 	go kv.WatchConfig()
 	go kv.applier()
 	go kv.pullShards()
+	go kv.garbageCollection()
 
 	return kv
 }

@@ -63,4 +63,15 @@ type ShardTransferReply struct {
 	Maxreq map[int]int
 	Shard  int
 	CfgN   int
+	GID    int
+}
+
+type DeleteArgs struct {
+	CfgN  int
+	Shard int
+}
+
+type DeleteReply struct {
+	Succ bool
+	Err  Err
 }
