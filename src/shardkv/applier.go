@@ -145,6 +145,13 @@ func (kv *ShardKV) applier() {
 			} else if reply, ok := cmd.Command.(ShardTransferReply); ok {
 				kv.UpdateShards(reply.Shard, reply.Table, reply.Maxreq)
 			}
+			if kv.CheckSnapshot() {
+				kv.rf.Snapshot(kv.lastApplied, kv.CreateSnapshot())
+			}
+			kv.mu.Unlock()
+		} else if cmd.SnapshotValid {
+			kv.mu.Lock()
+			kv.DecodeSnapshot(&cmd)
 			kv.mu.Unlock()
 		}
 	}

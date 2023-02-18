@@ -39,6 +39,7 @@ const (
 	dKVraft logTopic = "KVRA"
 	dInfo   logTopic = "INFO"
 	dError  logTopic = "ERRO"
+	dSnap   logTopic = "SNAP"
 )
 
 var debugStart time.Time
