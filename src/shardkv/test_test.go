@@ -787,7 +787,7 @@ func TestChallenge1Delete(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		check(t, ck, ka[i], va[i])
 	}
-
+	time.Sleep(1 * time.Second)
 	total := 0
 	for gi := 0; gi < cfg.ngroups; gi++ {
 		for i := 0; i < cfg.n; i++ {
