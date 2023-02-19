@@ -154,7 +154,8 @@ func (kv *ShardKV) applier() {
 			kv.mu.Lock()
 			if cmd.CommandIndex <= kv.lastApplied {
 				DebugLog(dKVraft, "G%d S%d KV index %d duplicate", kv.gid, kv.me, cmd.CommandIndex)
-				return
+				kv.mu.Unlock()
+				continue
 			}
 			kv.lastApplied = cmd.CommandIndex
 			if _, ok := cmd.Command.(Op); ok {

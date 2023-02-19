@@ -214,6 +214,7 @@ func (sc *ShardCtrler) applier() {
 			op := cmd.Command.(Op)
 			if cmd.CommandIndex <= sc.lastApplied {
 				DebugLog(dCtrl, "S%d KV index %d duplicate", sc.me, cmd.CommandIndex)
+				sc.mu.Unlock()
 				continue
 			}
 			sc.lastApplied = cmd.CommandIndex
