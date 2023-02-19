@@ -1,1 +1,1 @@
-./dtest -v -v -v -o ./tmp -n $1 -p $2 ALLTESTS $3
+./dtest -o ./tmp -n $1 -p $2 ALLTESTS $3
