@@ -13,3 +13,4 @@ mrtmp.*
 /main/res.txt
 /main/a.txt
 /raft/*.txt
+tmp/*

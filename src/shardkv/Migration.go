@@ -135,7 +135,7 @@ func (kv *ShardKV) garbageCollection() {
 			kv.mu.Unlock()
 			wait.Wait()
 		}
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
