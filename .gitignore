@@ -7,3 +7,4 @@ src/raft/*.log
 src/raft/errorLog/*.log
 src/kvraft/*.log
 src/shardkv/tmp/*
+src/shardkv/*.log

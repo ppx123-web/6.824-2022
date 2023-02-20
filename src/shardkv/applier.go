@@ -2,6 +2,7 @@ package shardkv
 
 import (
 	"log"
+	"os"
 
 	"6.824/raft"
 	"6.824/shardctrler"
@@ -57,12 +58,14 @@ func (kv *ShardKV) DataOperation(cmd raft.ApplyMsg) {
 				}
 				DebugLog(dKVraft, "G%d S%d KV apply %v, shard %d, index %d, get %v", kv.gid, kv.me, op, shard, cmd.CommandIndex, kv.table[op.Key])
 			}
+		case "Empty":
+			return
 		default:
 			log.Fatal("Error cmd")
 		}
 	} else {
 		info.Err = ErrWrongGroup
-		DebugLog(dKVraft, "G%d S%d KV WrongGroup, %v shard %d, acc %v", kv.gid, kv.me, op.Key, key2shard(op.Key), kv.Respon)
+		DebugLog(dKVraft, "G%d S%d KV WrongGroup, key %v, shard %d, acc %v", kv.gid, kv.me, op.Key, key2shard(op.Key), kv.Respon)
 	}
 
 	_, isLeader := kv.rf.GetState()
@@ -78,7 +81,7 @@ func (kv *ShardKV) DataOperation(cmd raft.ApplyMsg) {
 
 func (kv *ShardKV) UpdateConfig(cfg shardctrler.Config) {
 	prevcfg := kv.cfg
-	if cfg.Num <= prevcfg.Num {
+	if cfg.Num <= prevcfg.Num || len(kv.InShard) != 0 {
 		return
 	}
 	kv.cfg = cfg
@@ -97,7 +100,7 @@ func (kv *ShardKV) UpdateConfig(cfg shardctrler.Config) {
 			kv.Respon[shard] = false
 		}
 	}
-	DebugLog(dKVraft, "G%d S%d Update Config to %d, need %v, out %v", kv.gid, kv.me, kv.cfg.Num, kv.InShard, outShards)
+	DebugLog(dKVraft, "G%d S%d Update Config to %v, need %v, out %v", kv.gid, kv.me, kv.cfg, kv.InShard, outShards)
 	if len(outShards) > 0 {
 		kv.ShardDB[prevcfg.Num] = make(map[int]map[string]string)
 		for _, shard := range outShards {
@@ -115,7 +118,15 @@ func (kv *ShardKV) UpdateConfig(cfg shardctrler.Config) {
 }
 
 func (kv *ShardKV) UpdateShards(shard, cfgN int, table map[string]string, maxreq map[int]int) {
-	if cfgN != kv.cfg.Num-1 || kv.Respon[shard] {
+	kv.NoNeed[DeleteArgs{CfgN: cfgN, Shard: shard}] = true
+	if cfgN != kv.cfg.Num-1 {
+		return
+	}
+	if kv.Respon[shard] {
+		return
+	}
+	if s, ok := kv.InShard[shard]; !ok || s != cfgN {
+		os.Exit(1)
 		return
 	}
 	delete(kv.InShard, shard)
@@ -128,8 +139,7 @@ func (kv *ShardKV) UpdateShards(shard, cfgN int, table map[string]string, maxreq
 		}
 	}
 	kv.Respon[shard] = true
-	DebugLog(dKVraft, "G%d S%d update cfg %d shards %d to %v", kv.gid, kv.me, cfgN, shard, table)
-	kv.NoNeed[DeleteArgs{CfgN: cfgN, Shard: shard}] = true
+	DebugLog(dKVraft, "G%d S%d update cfg %d shards %d to %v, left %v", kv.gid, kv.me, cfgN, shard, table, kv.InShard)
 }
 
 func (kv *ShardKV) DeleteDB(cfgN, shard, index int) {
@@ -140,7 +150,7 @@ func (kv *ShardKV) DeleteDB(cfgN, shard, index int) {
 	_, isLeader := kv.rf.GetState()
 	ch, ok := kv.Inform[index]
 	if ok && isLeader {
-		DebugLog(dKVraft, "G%d S%d KV notify index %d", kv.gid, kv.me, index)
+		DebugLog(dKVraft, "G%d S%d DeleteDB notify index %d", kv.gid, kv.me, index)
 		ch <- informCh{
 			Err: OK,
 		}
@@ -150,10 +160,11 @@ func (kv *ShardKV) DeleteDB(cfgN, shard, index int) {
 func (kv *ShardKV) applier() {
 	for !kv.killed() {
 		cmd := <-kv.applyCh
+		DebugLog(dKVraft, "G%d S%d apply index %d", kv.gid, kv.me, cmd.CommandIndex)
 		if cmd.CommandValid {
 			kv.mu.Lock()
 			if cmd.CommandIndex <= kv.lastApplied {
-				DebugLog(dKVraft, "G%d S%d KV index %d duplicate", kv.gid, kv.me, cmd.CommandIndex)
+				DebugLog(dKVraft, "G%d S%d index %d duplicate", kv.gid, kv.me, cmd.CommandIndex)
 				kv.mu.Unlock()
 				continue
 			}

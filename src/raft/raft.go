@@ -127,6 +127,16 @@ func (rf *Raft) GetLeader() int {
 	return rf.leader
 }
 
+func (rf *Raft) HasCurrentTermLog() bool {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	if rf.log.LogLength() == 0 {
+		return false
+	}
+	term := rf.log.LastLogTerm()
+	return term == rf.currentTerm
+}
+
 // the service using Raft (e.g. a k/v server) wants to start
 // agreement on the next command to be appended to Raft's log. if this
 // server isn't the leader, returns false. otherwise start the

@@ -1,6 +1,7 @@
 package shardkv
 
 import (
+	"os"
 	"sync"
 	"time"
 
@@ -10,31 +11,37 @@ import (
 func (kv *ShardKV) WatchConfig() {
 	for !kv.killed() {
 		kv.mu.Lock()
-		config := kv.mck.Query(kv.cfg.Num + 1)
+		next := kv.cfg.Num + 1
+		kv.mu.Unlock()
+		config := kv.mck.Query(next)
+		kv.mu.Lock()
 		if _, isLeader := kv.rf.GetState(); isLeader && len(kv.InShard) == 0 && kv.cfg.Num < config.Num {
 			DebugLog(dKVraft, "G%d S%d start config %d", kv.gid, kv.me, config.Num)
-			kv.rf.Start(config)
+			index, _, isLeader := kv.rf.Start(config)
+			if index == -1 || !isLeader {
+				os.Exit(1)
+			}
 		}
 		kv.mu.Unlock()
 		time.Sleep(100 * time.Millisecond)
 	}
 }
 
-func (kv *ShardKV) SendShardMigration(args *ShardTransferArg, config *shardctrler.Config) ShardTransferReply {
-	for {
-		gid := config.Shards[args.Shard]
-		if servers, ok := config.Groups[gid]; ok {
-			// try each server for the shard.
-			for si := 0; si < len(servers); si++ {
-				srv := kv.make_end(servers[si])
-				var reply ShardTransferReply
-				ok := srv.Call("ShardKV.ShardMigration", args, &reply)
-				if ok && reply.Succ && reply.Err == OK {
-					return reply
-				}
+func (kv *ShardKV) SendShardMigration(args *ShardTransferArg, config *shardctrler.Config) (bool, ShardTransferReply) {
+	gid := config.Shards[args.Shard]
+	if servers, ok := config.Groups[gid]; ok {
+		// try each server for the shard.
+		for si := 0; si < len(servers); si++ {
+			srv := kv.make_end(servers[si])
+			var reply ShardTransferReply
+			DebugLog(dKVraft, "G%d S%d try pull shards %d, cfg %d", kv.gid, kv.me, args.Shard, args.ConfigN)
+			ok := srv.Call("ShardKV.ShardMigration", args, &reply)
+			if ok && reply.Succ && reply.Err == OK {
+				return true, reply
 			}
 		}
 	}
+	return false, ShardTransferReply{}
 }
 
 func (kv *ShardKV) ShardMigration(args *ShardTransferArg, reply *ShardTransferReply) {
@@ -56,7 +63,7 @@ func (kv *ShardKV) ShardMigration(args *ShardTransferArg, reply *ShardTransferRe
 	reply.Err = OK
 	reply.Shard = args.Shard
 	reply.CfgN = args.ConfigN
-	DebugLog(dKVraft, "G%d S%d KV reply table maxreq", kv.gid, kv.me)
+	DebugLog(dKVraft, "G%d S%d reply cfg %d, shard %d", kv.gid, kv.me, args.ConfigN, args.Shard)
 }
 
 func (kv *ShardKV) pullShards() {
@@ -65,21 +72,26 @@ func (kv *ShardKV) pullShards() {
 		if _, isLeader := kv.rf.GetState(); isLeader && len(kv.InShard) > 0 {
 			var wait sync.WaitGroup
 			for shard, cfgN := range kv.InShard {
-				DebugLog(dKVraft, "G%d S%d KV start pull shards %d, cfg %d", kv.gid, kv.me, shard, cfgN)
+				DebugLog(dKVraft, "G%d S%d start pull shards %d, cfg %d", kv.gid, kv.me, shard, cfgN)
 				wait.Add(1)
 				go func(shard int, cfg shardctrler.Config) {
 					defer wait.Done()
-					reply := kv.SendShardMigration(&ShardTransferArg{
+					ok, reply := kv.SendShardMigration(&ShardTransferArg{
 						ConfigN: cfg.Num,
 						Shard:   shard,
 					}, &cfg)
-					kv.rf.Start(reply)
-					DebugLog(dKVraft, "G%d S%d KV pull shards succ %d, cfg %d, table %v", kv.gid, kv.me, reply.Shard, reply.CfgN, reply.Table)
+					if ok {
+						index, _, isLeader := kv.rf.Start(reply)
+						if index == -1 || !isLeader {
+							os.Exit(1)
+						}
+						DebugLog(dKVraft, "G%d S%d pull shards succ %d, cfg %d, table %v, index %d", kv.gid, kv.me, reply.Shard, reply.CfgN, reply.Table, index)
+					}
 				}(shard, kv.mck.Query(cfgN))
 			}
 			kv.mu.Unlock()
 			wait.Wait()
-			DebugLog(dKVraft, "G%d S%d KV pull all succ", kv.gid, kv.me)
+			DebugLog(dKVraft, "G%d S%d pull all succ", kv.gid, kv.me)
 		} else {
 			kv.mu.Unlock()
 		}
@@ -96,7 +108,8 @@ func (kv *ShardKV) garbageCollection() {
 				wait.Add(1)
 				go func(args DeleteArgs) {
 					defer wait.Done()
-					if servers, ok := kv.cfg.Groups[kv.mck.Query(args.CfgN).Shards[args.Shard]]; ok {
+					cfg := kv.mck.Query(args.CfgN)
+					if servers, ok := cfg.Groups[cfg.Shards[args.Shard]]; ok {
 						for si := 0; si < len(servers); si++ {
 							srv := kv.make_end(servers[si])
 							var reply ShardTransferReply
@@ -110,28 +123,6 @@ func (kv *ShardKV) garbageCollection() {
 					}
 				}(args)
 			}
-
-			// for cfgN, m := range kv.ShardDB {
-			// 	for shard := range m {
-			// 		wait.Add(1)
-			// 		go func(args DeleteArgs) {
-			// 			defer wait.Done()
-			// 			if servers, ok := kv.cfg.Groups[kv.mck.Query(args.CfgN).Shards[args.Shard]]; ok {
-			// 				for si := 0; si < len(servers); si++ {
-			// 					srv := kv.make_end(servers[si])
-			// 					var reply ShardTransferReply
-			// 					ok := srv.Call("ShardKV.CanDelete", &args, &reply)
-			// 					if ok && reply.Succ && reply.Err == OK {
-			// 						kv.rf.Start(args)
-			// 					}
-			// 				}
-			// 			}
-			// 		}(DeleteArgs{
-			// 			CfgN:  cfgN,
-			// 			Shard: shard,
-			// 		})
-			// 	}
-			// }
 			kv.mu.Unlock()
 			wait.Wait()
 		}
@@ -144,6 +135,9 @@ func (kv *ShardKV) CanDelete(args *DeleteArgs, reply *DeleteReply) {
 	reply.Err = ErrWrongLeader
 	reply.Succ = false
 	if isLeader {
+		if index == -1 {
+			os.Exit(1)
+		}
 		ch := kv.CheckInform(index, -1, -1)
 		info := <-ch
 		reply.Err = Err(info.Err)
@@ -155,4 +149,15 @@ func (kv *ShardKV) CanDelete(args *DeleteArgs, reply *DeleteReply) {
 		reply.Succ = true
 	}
 
+}
+
+func (kv *ShardKV) EmptyAppend() {
+	for !kv.killed() {
+		if _, isLeader := kv.rf.GetState(); isLeader && !kv.rf.HasCurrentTermLog() {
+			kv.rf.Start(Op{
+				Cmd: "Empty",
+			})
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 }

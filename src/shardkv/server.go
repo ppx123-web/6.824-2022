@@ -55,9 +55,15 @@ type ShardKV struct {
 }
 
 func (kv *ShardKV) CheckShardsGid(key string) bool {
+	kv.mu.Lock()
+	defer kv.mu.Unlock()
 	shard := key2shard(key)
 	gid := kv.cfg.Shards[shard]
-	return kv.gid == gid
+	if kv.gid == gid && kv.Respon[shard] {
+		return true
+	} else {
+		return false
+	}
 }
 
 func (kv *ShardKV) CheckInform(Index int, ClerkId int, Seq int) chan informCh {
@@ -97,12 +103,12 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) {
 			kv.mu.Unlock()
 			reply.Value = info.Value
 		case <-time.After(50 * time.Millisecond):
-			DebugLog(dKVraft, "G%d S%d KV Get reply err %v", kv.gid, reply.Err)
 			reply.Err = ErrTimeOut
+			DebugLog(dKVraft, "G%d S%d KV Get reply err %v", kv.gid, kv.me, reply.Err)
 		}
 	} else {
 		reply.Err = ErrWrongLeader
-		DebugLog(dKVraft, "G%d S%d KV Not Leader", kv.gid, kv.me)
+		DebugLog(dKVraft, "G%d S%d KV Not Leader", kv.gid, kv.me, kv.me)
 	}
 }
 
@@ -130,8 +136,8 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 			delete(kv.Inform, index)
 			kv.mu.Unlock()
 		case <-time.After(50 * time.Millisecond):
-			DebugLog(dKVraft, "G%d S%d KV Get reply err %v", kv.gid, kv.me, reply.Err)
 			reply.Err = ErrTimeOut
+			DebugLog(dKVraft, "G%d S%d KV Get reply err %v", kv.gid, kv.me, reply.Err)
 		}
 	} else {
 		reply.Err = ErrWrongLeader
@@ -236,6 +242,7 @@ func StartServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister,
 	go kv.applier()
 	go kv.pullShards()
 	go kv.garbageCollection()
+	go kv.EmptyAppend()
 
 	return kv
 }

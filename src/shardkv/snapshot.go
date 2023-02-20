@@ -38,6 +38,7 @@ func (kv *ShardKV) DecodeSnapshot(cmd *raft.ApplyMsg) {
 	e1 := d.Decode(&lastApplied)
 	e2 := d.Decode(&Maxreq)
 	e3 := d.Decode(&table)
+
 	e4 := d.Decode(&ShardDB)
 	e5 := d.Decode(&cfg)
 	e6 := d.Decode(&Respon)
@@ -53,9 +54,9 @@ func (kv *ShardKV) DecodeSnapshot(cmd *raft.ApplyMsg) {
 			kv.ShardDB = ShardDB
 			kv.cfg = cfg
 			copy(kv.Respon[:], Respon[:])
-			DebugLog(dSnap, "G%d S%d snapshot respon %v", kv.gid, kv.me, kv.Respon)
 			kv.InShard = InShard
 			kv.NoNeed = NoNeed
+			DebugLog(dSnap, "G%d S%d install snapshot, cfg %d, respon %v, Inshard %v, index %d", kv.gid, kv.me, kv.cfg.Num, kv.Respon, kv.InShard, kv.lastApplied)
 
 		}
 	}
@@ -76,5 +77,6 @@ func (kv *ShardKV) CreateSnapshot() []byte {
 	if e1 != nil || e2 != nil || e3 != nil || e4 != nil || e5 != nil || e6 != nil || e7 != nil || e8 != nil {
 		DebugLog(dError, "G%d S%d get persist data fail, %v %v %v %v %v %v %v %v", kv.gid, kv.me, e1, e2, e3, e4, e5, e6, e7)
 	}
+	DebugLog(dSnap, "G%d S%d create snapshot, cfg %d, respon %v, Inshard %v, index %d", kv.gid, kv.me, kv.cfg.Num, kv.Respon, kv.InShard, kv.lastApplied)
 	return w.Bytes()
 }
