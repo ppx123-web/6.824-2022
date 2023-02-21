@@ -2,7 +2,6 @@ package shardkv
 
 import (
 	"log"
-	"os"
 
 	"6.824/raft"
 	"6.824/shardctrler"
@@ -126,7 +125,6 @@ func (kv *ShardKV) UpdateShards(shard, cfgN int, table map[string]string, maxreq
 		return
 	}
 	if s, ok := kv.InShard[shard]; !ok || s != cfgN {
-		os.Exit(1)
 		return
 	}
 	delete(kv.InShard, shard)

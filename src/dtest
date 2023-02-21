@@ -105,6 +105,8 @@ def run_test(test: str, race: bool, timing: bool):
         test_cmd = ["go", "test"]
     elif test == "ALLTESTS":
         test_cmd = ["go", "test", "--count=1", "-v", "-p", "1", "./raft", "./kvraft", "./shardctrler", "./shardkv"]
+    elif test == "PALLTESTS":
+        test_cmd = ["go", "test", "--count=1", "-v", "./raft", "./kvraft", "./shardctrler", "./shardkv"]
     else:
         test_cmd = ["go", "test", f"-run={test}"]
     if race:

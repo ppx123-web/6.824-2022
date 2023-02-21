@@ -1,7 +1,6 @@
 package shardkv
 
 import (
-	"os"
 	"sync"
 	"time"
 
@@ -17,10 +16,7 @@ func (kv *ShardKV) WatchConfig() {
 		kv.mu.Lock()
 		if _, isLeader := kv.rf.GetState(); isLeader && len(kv.InShard) == 0 && kv.cfg.Num < config.Num {
 			DebugLog(dKVraft, "G%d S%d start config %d", kv.gid, kv.me, config.Num)
-			index, _, isLeader := kv.rf.Start(config)
-			if index == -1 || !isLeader {
-				os.Exit(1)
-			}
+			kv.rf.Start(config)
 		}
 		kv.mu.Unlock()
 		time.Sleep(100 * time.Millisecond)
@@ -81,10 +77,7 @@ func (kv *ShardKV) pullShards() {
 						Shard:   shard,
 					}, &cfg)
 					if ok {
-						index, _, isLeader := kv.rf.Start(reply)
-						if index == -1 || !isLeader {
-							os.Exit(1)
-						}
+						index, _, _ := kv.rf.Start(reply)
 						DebugLog(dKVraft, "G%d S%d pull shards succ %d, cfg %d, table %v, index %d", kv.gid, kv.me, reply.Shard, reply.CfgN, reply.Table, index)
 					}
 				}(shard, kv.mck.Query(cfgN))
@@ -135,9 +128,6 @@ func (kv *ShardKV) CanDelete(args *DeleteArgs, reply *DeleteReply) {
 	reply.Err = ErrWrongLeader
 	reply.Succ = false
 	if isLeader {
-		if index == -1 {
-			os.Exit(1)
-		}
 		ch := kv.CheckInform(index, -1, -1)
 		info := <-ch
 		reply.Err = Err(info.Err)
